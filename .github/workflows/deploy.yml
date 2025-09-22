@@ -43,8 +43,20 @@ jobs:
         id: prepare_ssh
         run: |
           set -euo pipefail
+          if [ -z "${{ secrets.SSH_KEY }}" ]; then
+            echo "SSH_KEY secret is empty. Please add a private key via repository settings." >&2
+            exit 1
+          fi
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          KEY_CONTENT="${{ secrets.SSH_KEY }}"
+          if echo "$KEY_CONTENT" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+            echo "$KEY_CONTENT" | tr -d '\r' > ~/.ssh/deploy_key
+          else
+            echo "$KEY_CONTENT" | tr -d '\r\n' | base64 -d > ~/.ssh/deploy_key || {
+              echo "SSH_KEY secret does not look like an OpenSSH private key or base64-encoded key." >&2
+              exit 1
+            }
+          fi
           chmod 600 ~/.ssh/deploy_key
           if [ -n "${{ secrets.SSH_HOST }}" ]; then
             ssh-keyscan -T 5 -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
