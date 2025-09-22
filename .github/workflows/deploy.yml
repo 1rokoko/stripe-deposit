@@ -39,12 +39,23 @@ jobs:
           git reset --hard
           git archive --format=tar HEAD | gzip > release.tar.gz
 
+      - name: Prepare SSH key
+        id: prepare_ssh
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "${{ secrets.SSH_HOST }}" ]; then
+            ssh-keyscan -T 5 -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          fi
+
       - name: Upload archive to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          key_path: ~/.ssh/deploy_key
           source: release.tar.gz
           target: /tmp/stripe-deposit.tar.gz
 
@@ -53,7 +64,7 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          key_path: ~/.ssh/deploy_key
           script: |
             set -euo pipefail
             DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"
