@@ -1,0 +1,22 @@
+version: '3.9'
+services:
+  api:
+    build: .
+    command: ["npm", "start"]
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+  worker:
+    build: .
+    command: ["npm", "run", "reauth-worker"]
+    env_file:
+      - .env
+    depends_on:
+      - api
+    volumes:
+      - ./data:/app/data
