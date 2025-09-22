@@ -33,9 +33,9 @@
 3. Operator tooling (completed)
    - [x] CLI/script to filter deposits by status/customer.
    - [x] Endpoint to mark `requires_action` deposits resolved after client confirmation.
-   - [ ] Admin tooling to resend или inspect notifications for a specific deposit.
+   - [x] Admin tooling to resend или inspect notifications for a specific deposit.
 4. Testing & QA
-   - [ ] Stripe CLI based end-to-end tests including webhook round-trip.
+   - [x] Stripe CLI based end-to-end tests including webhook round-trip (harness via `npm run test:e2e:stripe`).
    - [x] Unit tests covering `StripeWebhookHandler` success and failure branches.
    - [x] Integration tests for `SqliteDepositRepository` (schema migrations, persistence guarantees).
    - [x] HTTP API smoke tests (auth enforcement, validation errors, webhook signature failures).
