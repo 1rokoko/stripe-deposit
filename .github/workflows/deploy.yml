@@ -1,0 +1,77 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Create deployment archive
+        run: |
+          tar \
+            --exclude=".git" \
+            --exclude="node_modules" \
+            --exclude=".github" \
+            -czf release.tar.gz .
+
+      - name: Upload archive to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: release.tar.gz
+          target: /tmp/stripe-deposit.tar.gz
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"
+            if [ -z "$DEPLOY_DIR" ]; then
+              DEPLOY_DIR="/opt/stripe-deposit"
+            fi
+            mkdir -p "$DEPLOY_DIR"
+            tar -xzf /tmp/stripe-deposit.tar.gz -C "$DEPLOY_DIR" --strip-components=1
+            rm -f /tmp/stripe-deposit.tar.gz
+            cd "$DEPLOY_DIR"
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "Docker is required on the target host" >&2
+              exit 1
+            fi
+            if docker compose version >/dev/null 2>&1; then
+              docker compose up -d --build
+            else
+              docker-compose up -d --build
+            fi
