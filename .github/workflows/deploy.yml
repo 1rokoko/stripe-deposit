@@ -66,12 +66,25 @@ jobs:
             tar -xzf /tmp/stripe-deposit.tar.gz -C "$DEPLOY_DIR" --strip-components=1
             rm -f /tmp/stripe-deposit.tar.gz
             cd "$DEPLOY_DIR"
-            if ! command -v docker >/dev/null 2>&1; then
-              echo "Docker is required on the target host" >&2
-              exit 1
-            fi
-            if docker compose version >/dev/null 2>&1; then
-              docker compose up -d --build
+            if command -v docker >/dev/null 2>&1; then
+              if docker compose version >/dev/null 2>&1; then
+                docker compose up -d --build
+              else
+                docker-compose up -d --build
+              fi
             else
-              docker-compose up -d --build
+              if ! command -v node >/dev/null 2>&1; then
+                echo "Node.js is required on the target host" >&2
+                exit 1
+              fi
+              if [ -f package-lock.json ]; then
+                npm ci --omit=dev
+              else
+                npm install --production
+              fi
+              if command -v pm2 >/dev/null 2>&1; then
+                pm2 start npm --name stripe-deposit -- start || pm2 restart stripe-deposit
+              else
+                nohup npm start >/var/log/stripe-deposit.log 2>&1 &
+              fi
             fi
