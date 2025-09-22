@@ -35,12 +35,9 @@ jobs:
 
       - name: Create deployment archive
         run: |
-          tar \
-            --exclude=".git" \
-            --exclude="node_modules" \
-            --exclude=".github" \
-            --exclude="release.tar.gz" \
-            -czf release.tar.gz .
+          git clean -fdx
+          git reset --hard
+          git archive --format=tar HEAD | gzip > release.tar.gz
 
       - name: Upload archive to server
         uses: appleboy/scp-action@v0.1.7
