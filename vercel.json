@@ -1,0 +1,62 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/stripe/webhook.js": {
+      "memory": 512,
+      "maxDuration": 15
+    },
+
+    "api/metrics.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/healthz.js": {
+      "memory": 128,
+      "maxDuration": 5
+    },
+    "api/demo.js": {
+      "memory": 256,
+      "maxDuration": 10
+    }
+  },
+  "routes": [
+    {
+      "src": "/",
+      "dest": "/public/index.html"
+    },
+    {
+      "src": "/healthz",
+      "dest": "/api/healthz"
+    },
+    {
+      "src": "/metrics",
+      "dest": "/api/metrics"
+    },
+    {
+      "src": "/api/demo(.*)",
+      "dest": "/api/demo"
+    },
+    {
+      "src": "/api/stripe/webhook",
+      "dest": "/api/stripe/webhook"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "regions": ["iad1"],
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }
+}

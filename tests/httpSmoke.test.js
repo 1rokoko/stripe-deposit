@@ -51,7 +51,16 @@ test('HTTP API smoke test', async (t) => {
   const server = spawn(process.execPath, ['src/server.js'], {
     cwd: path.join(__dirname, '..'),
     env,
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  // Log server output for debugging
+  server.stdout.on('data', (data) => {
+    console.log('Server stdout:', data.toString());
+  });
+
+  server.stderr.on('data', (data) => {
+    console.error('Server stderr:', data.toString());
   });
 
   let closed = false;

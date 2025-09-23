@@ -6,3 +6,5 @@ npm-debug.log*
 /data/*.json
 /data/*.log
 !data/.gitkeep
+
+.vercel

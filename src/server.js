@@ -6,9 +6,9 @@ const { StripeWebhookHandler } = require('./stripe/webhookHandler');
 const { WebhookRetryQueue } = require('./stripe/webhookRetryQueue');
 const { DepositService } = require('./services/depositService');
 const { NotificationService } = require('./services/notificationService');
-const { SqliteDepositRepository } = require('./repositories/sqliteDepositRepository');
 const { buildLogger } = require('./utils/logger');
 const { JobHealthStore } = require('./utils/jobHealthStore');
+const { createDepositRepository } = require('./repositories/repositoryFactory');
 
 const env = loadEnv();
 
@@ -24,7 +24,7 @@ if (!env.API_AUTH_TOKEN) {
 
 const logger = buildLogger('server');
 const stripeClient = new StripeClient({ apiKey: env.STRIPE_SECRET_KEY });
-const repository = new SqliteDepositRepository({ filePath: env.DATABASE_FILE });
+const repository = createDepositRepository({ filePath: env.DATABASE_FILE });
 const notificationService = new NotificationService({
   filePath: env.NOTIFICATIONS_FILE,
   logger: buildLogger('notification-service'),
