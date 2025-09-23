@@ -3,9 +3,9 @@
  * Provides metrics and overview data for admin dashboard
  */
 
-import { requireAdminAuth, logAdminAction } from '../../../lib/admin-auth';
-import { createDepositRepository } from '../../../src/repositories/repositoryFactory';
-import { loadEnv } from '../../../src/config';
+const { requireAdminAuth, logAdminAction } = require('../../../lib/admin-auth');
+const { createDepositRepository } = require('../../../src/repositories/repositoryFactory');
+const { loadEnv } = require('../../../src/config');
 
 async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -169,4 +169,4 @@ function calculatePercentageChange(current, previous) {
   return `${sign}${change.toFixed(1)}%`;
 }
 
-export default requireAdminAuth(handler);
+module.exports = requireAdminAuth(handler);

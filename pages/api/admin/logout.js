@@ -3,7 +3,7 @@
  * Handles admin logout and token invalidation
  */
 
-import { requireAdminAuth, logAdminAction } from '../../../lib/admin-auth';
+const { requireAdminAuth, logAdminAction } = require('../../../lib/admin-auth');
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -56,4 +56,4 @@ async function handler(req, res) {
   }
 }
 
-export default requireAdminAuth(handler);
+module.exports = requireAdminAuth(handler);

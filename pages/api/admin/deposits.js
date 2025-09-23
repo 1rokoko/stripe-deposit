@@ -3,9 +3,9 @@
  * Handles deposit listing and management operations
  */
 
-import { requireAdminAuth, logAdminAction } from '../../../lib/admin-auth';
-import { createDepositRepository } from '../../../src/repositories/repositoryFactory';
-import { loadEnv } from '../../../src/config';
+const { requireAdminAuth, logAdminAction } = require('../../../lib/admin-auth');
+const { createDepositRepository } = require('../../../src/repositories/repositoryFactory');
+const { loadEnv } = require('../../../src/config');
 
 async function handler(req, res) {
   try {
@@ -213,4 +213,4 @@ async function handleGetDeposits(req, res, repository) {
   }
 }
 
-export default requireAdminAuth(handler);
+module.exports = requireAdminAuth(handler);
