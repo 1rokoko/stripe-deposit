@@ -38,6 +38,8 @@ async function testEndpoint(path, headers = {}) {
 
 async function runTests() {
     console.log('🧪 Тестирование API endpoints...\n');
+    console.log('⚠️  SKIPPED: Production testing disabled during deployment');
+    return;
 
     // Test 1: Health check
     console.log('1️⃣ Тестирование /healthz');

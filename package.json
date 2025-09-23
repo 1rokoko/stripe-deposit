@@ -8,10 +8,8 @@
     "reauth-worker": "node src/jobs/reauthorizationWorker.js",
     "deposits:cli": "node scripts/deposits-cli.js",
     "notifications:cli": "node scripts/notifications-cli.js",
-    "test": "node --test",
-    "test:e2e:stripe": "node scripts/stripe-cli-e2e.js",
-    "build": "next build",
-    "dev": "next dev"
+    "test": "node --test tests/",
+    "test:e2e:stripe": "node scripts/stripe-cli-e2e.js"
   },
   "keywords": [
     "stripe",
@@ -22,18 +20,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "better-sqlite3": "^9.4.0",
-    "jsonwebtoken": "^9.0.2",
-    "next": "^14.0.0",
-    "pg": "^8.11.3",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "stripe": "^14.21.0",
-    "uuid": "^8.3.2"
-  },
-  "devDependencies": {
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.13"
+    "better-sqlite3": "^9.4.0"
   }
 }
