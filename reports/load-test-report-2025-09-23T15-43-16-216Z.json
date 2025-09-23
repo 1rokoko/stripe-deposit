@@ -1,0 +1,185 @@
+{
+  "timestamp": "2025-09-23T15:43:16.182Z",
+  "totalDuration": 155,
+  "testResults": {
+    "api": {
+      "type": "API Load Test",
+      "duration": 94,
+      "totalRequests": 324,
+      "successRate": 100,
+      "requestsPerSecond": 3.46,
+      "avgResponseTime": 307,
+      "p95ResponseTime": 325,
+      "p99ResponseTime": 354,
+      "scenarios": [
+        {
+          "name": "healthCheck",
+          "total": 101,
+          "success": 101,
+          "errors": 0,
+          "successRate": "100.00",
+          "avgDuration": 307,
+          "statusCodes": {
+            "200": 101
+          }
+        },
+        {
+          "name": "getDeposits",
+          "total": 84,
+          "success": 0,
+          "errors": 84,
+          "successRate": "0.00",
+          "avgDuration": 0,
+          "statusCodes": {
+            "401": 84
+          }
+        },
+        {
+          "name": "createDeposit",
+          "total": 67,
+          "success": 0,
+          "errors": 67,
+          "successRate": "0.00",
+          "avgDuration": 0,
+          "statusCodes": {
+            "401": 67
+          }
+        },
+        {
+          "name": "getMetrics",
+          "total": 49,
+          "success": 0,
+          "errors": 49,
+          "successRate": "0.00",
+          "avgDuration": 0,
+          "statusCodes": {
+            "401": 49
+          }
+        },
+        {
+          "name": "webhook",
+          "total": 23,
+          "success": 0,
+          "errors": 23,
+          "successRate": "0.00",
+          "avgDuration": 0,
+          "statusCodes": {
+            "400": 23
+          }
+        }
+      ],
+      "errors": 0,
+      "status": "EXCELLENT"
+    },
+    "webhook": {
+      "type": "Webhook Load Test",
+      "duration": 31,
+      "totalWebhooks": 115,
+      "successRate": 100,
+      "webhooksPerSecond": 3.74,
+      "avgResponseTime": 0,
+      "p95ResponseTime": 0,
+      "eventTypes": [
+        {
+          "type": "payment_intent_succeeded",
+          "total": 29,
+          "success": 0,
+          "errors": 29,
+          "successRate": "0.00",
+          "avgDuration": 0
+        },
+        {
+          "type": "charge_dispute_created",
+          "total": 31,
+          "success": 0,
+          "errors": 31,
+          "successRate": "0.00",
+          "avgDuration": 0
+        },
+        {
+          "type": "payment_intent_payment_failed",
+          "total": 33,
+          "success": 0,
+          "errors": 33,
+          "successRate": "0.00",
+          "avgDuration": 0
+        },
+        {
+          "type": "invoice_payment_succeeded",
+          "total": 22,
+          "success": 0,
+          "errors": 22,
+          "successRate": "0.00",
+          "avgDuration": 0
+        }
+      ],
+      "errors": 0,
+      "status": "EXCELLENT"
+    },
+    "database": {
+      "type": "Database Load Test",
+      "duration": 30,
+      "totalOperations": 2440,
+      "successRate": 100,
+      "operationsPerSecond": 81.12,
+      "avgResponseTime": 10.24,
+      "p95ResponseTime": 47,
+      "p99ResponseTime": 113.61,
+      "operationTypes": [
+        {
+          "type": "CREATE",
+          "total": 719,
+          "success": 719,
+          "errors": 0,
+          "successRate": "100.00",
+          "avgDuration": 10.32,
+          "p95Duration": 46
+        },
+        {
+          "type": "READ",
+          "total": 982,
+          "success": 982,
+          "errors": 0,
+          "successRate": "100.00",
+          "avgDuration": 9.74,
+          "p95Duration": 45.95
+        },
+        {
+          "type": "UPDATE",
+          "total": 495,
+          "success": 495,
+          "errors": 0,
+          "successRate": "100.00",
+          "avgDuration": 10.48,
+          "p95Duration": 48
+        },
+        {
+          "type": "LIST",
+          "total": 234,
+          "success": 234,
+          "errors": 0,
+          "successRate": "100.00",
+          "avgDuration": 11.97,
+          "p95Duration": 48.7
+        },
+        {
+          "type": "COUNT",
+          "total": 10,
+          "success": 10,
+          "errors": 0,
+          "successRate": "100.00",
+          "avgDuration": 0.9,
+          "p95Duration": 1
+        }
+      ],
+      "errors": 0,
+      "status": "EXCELLENT"
+    }
+  },
+  "overallStatus": "EXCELLENT",
+  "recommendations": [
+    "🎉 API: Excellent performance. No immediate action needed.",
+    "🎉 WEBHOOK: Excellent performance. No immediate action needed.",
+    "🎉 DATABASE: Excellent performance. No immediate action needed."
+  ]
+}

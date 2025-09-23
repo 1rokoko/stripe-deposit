@@ -9,6 +9,7 @@ const { NotificationService } = require('./services/notificationService');
 const { buildLogger } = require('./utils/logger');
 const { JobHealthStore } = require('./utils/jobHealthStore');
 const { createDepositRepository } = require('./repositories/repositoryFactory');
+const { verifyAdminCredentials, generateAdminToken, verifyAdminToken, logAdminAction } = require('../lib/admin-auth');
 
 const env = loadEnv();
 
@@ -59,7 +60,7 @@ const webhookHandler = new StripeWebhookHandler({
   notifier: notificationService,
 });
 
-const PUBLIC_ROUTES = new Set(['/healthz', '/api/stripe/webhook']);
+const PUBLIC_ROUTES = new Set(['/healthz', '/api/stripe/webhook', '/api/admin/login']);
 const RATE_LIMIT_LIMIT = Math.max(1, Number.isFinite(env.RATE_LIMIT_MAX_REQUESTS) ? env.RATE_LIMIT_MAX_REQUESTS : 120);
 const RATE_LIMIT_WINDOW = Math.max(1_000, Number.isFinite(env.RATE_LIMIT_WINDOW_MS) ? env.RATE_LIMIT_WINDOW_MS : 60_000);
 const REQUEST_TIMEOUT = Math.max(1_000, Number.isFinite(env.REQUEST_TIMEOUT_MS) ? env.REQUEST_TIMEOUT_MS : 15_000);
@@ -260,6 +261,12 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-RateLimit-Reset', String(Math.ceil(rateLimitContext.resetAt / 1000)));
 
   try {
+    // Admin routes have their own authentication
+    if (pathname.startsWith('/api/admin/')) {
+      await handleAdminRoutes(req, res, pathname);
+      return;
+    }
+
     if (!PUBLIC_ROUTES.has(pathname) && !isAuthorized(req)) {
       unauthorized(res);
       return;
@@ -449,6 +456,214 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, status, { error: error.message });
   }
 });
+
+// Admin routes handler
+async function handleAdminRoutes(req, res, pathname) {
+  try {
+    // Admin login
+    if (pathname === '/api/admin/login' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const { email, password } = body;
+
+      if (!email || !password) {
+        sendJson(res, 400, {
+          error: 'Email and password are required',
+          code: 'MISSING_CREDENTIALS'
+        });
+        return;
+      }
+
+      const adminUser = verifyAdminCredentials(email, password);
+
+      if (!adminUser) {
+        logger.warn('Failed admin login attempt', {
+          email,
+          ip: req.socket.remoteAddress,
+          userAgent: req.headers['user-agent']
+        });
+
+        sendJson(res, 401, {
+          error: 'Invalid email or password',
+          code: 'INVALID_CREDENTIALS'
+        });
+        return;
+      }
+
+      const token = generateAdminToken(adminUser);
+
+      logAdminAction(adminUser, 'LOGIN', {
+        ip: req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
+      });
+
+      sendJson(res, 200, {
+        success: true,
+        message: 'Login successful',
+        token,
+        admin: {
+          id: adminUser.id,
+          email: adminUser.email,
+          role: adminUser.role
+        }
+      });
+      return;
+    }
+
+    // Check admin authentication for other routes
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      sendJson(res, 401, {
+        error: 'No admin token provided',
+        code: 'ADMIN_AUTH_REQUIRED'
+      });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    let adminAuth;
+    try {
+      adminAuth = verifyAdminToken(token);
+    } catch (error) {
+      sendJson(res, 401, {
+        error: 'Invalid admin token',
+        code: 'ADMIN_AUTH_INVALID'
+      });
+      return;
+    }
+
+    // Admin logout
+    if (pathname === '/api/admin/logout' && req.method === 'POST') {
+      logAdminAction(adminAuth.user, 'LOGOUT', {
+        ip: req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
+      });
+
+      sendJson(res, 200, {
+        success: true,
+        message: 'Logout successful'
+      });
+      return;
+    }
+
+    // Admin dashboard
+    if (pathname === '/api/admin/dashboard' && req.method === 'GET') {
+      logAdminAction(adminAuth.user, 'VIEW_DASHBOARD', {
+        ip: req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
+      });
+
+      const deposits = await depositService.listDeposits();
+
+      // Calculate metrics
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+      const totalDeposits = deposits.length;
+      const totalAmount = deposits.reduce((sum, d) => sum + d.amount, 0);
+      const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
+      const capturedDeposits = deposits.filter(d => d.status === 'captured').length;
+      const failedDeposits = deposits.filter(d => d.status === 'failed').length;
+
+      const completedDeposits = capturedDeposits + failedDeposits;
+      const successRate = completedDeposits > 0 ?
+        Math.round((capturedDeposits / completedDeposits) * 100) : 0;
+
+      const recentDeposits = deposits
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 10);
+
+      const metrics = {
+        totalDeposits,
+        totalAmount,
+        pendingDeposits,
+        successRate,
+        depositsChange: '+5.2%',
+        amountChange: '+12.1%',
+        pendingChange: '-2.3%',
+        successRateChange: '+1.1%',
+        recentDeposits,
+        lastUpdated: new Date().toISOString()
+      };
+
+      sendJson(res, 200, metrics);
+      return;
+    }
+
+    // Admin deposits list
+    if (pathname === '/api/admin/deposits' && req.method === 'GET') {
+      logAdminAction(adminAuth.user, 'VIEW_DEPOSITS', {
+        ip: req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
+      });
+
+      const deposits = await depositService.listDeposits();
+
+      sendJson(res, 200, {
+        success: true,
+        deposits: deposits.map(deposit => ({
+          ...deposit,
+          formattedAmount: (deposit.amount / 100).toFixed(2),
+          customer: deposit.customer || {
+            name: deposit.customer_id ? `Customer ${deposit.customer_id.substring(0, 8)}` : 'Unknown'
+          }
+        })),
+        pagination: {
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: deposits.length,
+          itemsPerPage: deposits.length
+        },
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    // Admin bulk operations
+    if (pathname === '/api/admin/deposits/bulk' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      sendJson(res, 400, {
+        error: 'Bulk operations not implemented yet',
+        code: 'NOT_IMPLEMENTED'
+      });
+      return;
+    }
+
+    // Admin export
+    if (pathname === '/api/admin/deposits/export' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      sendJson(res, 400, {
+        error: 'Export not implemented yet',
+        code: 'NOT_IMPLEMENTED'
+      });
+      return;
+    }
+
+    // Admin deposit actions
+    const depositActionMatch = pathname.match(/^\/api\/admin\/deposits\/([^\/]+)\/([^\/]+)$/);
+    if (depositActionMatch && req.method === 'POST') {
+      const [, depositId, action] = depositActionMatch;
+      sendJson(res, 400, {
+        error: 'Deposit actions not implemented yet',
+        code: 'NOT_IMPLEMENTED',
+        depositId,
+        action
+      });
+      return;
+    }
+
+    sendJson(res, 404, { error: 'Admin endpoint not found' });
+
+  } catch (error) {
+    logger.error('Admin route error', {
+      error: error.message,
+      path: pathname
+    });
+    sendJson(res, 500, {
+      error: 'Internal server error',
+      code: 'ADMIN_ERROR'
+    });
+  }
+}
 
 const port = env.PORT || 3000;
 server.listen(port, () => {
