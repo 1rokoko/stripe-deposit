@@ -63,6 +63,27 @@ class MemoryDepositRepository {
     const deposits = await this.findAll(filters);
     return deposits.length;
   }
+
+  // Compatibility method for DepositService
+  async list() {
+    return Array.from(this.deposits.values());
+  }
+
+  // Additional methods needed by DepositService
+  async create(deposit) {
+    this.deposits.set(deposit.id, { ...deposit });
+    return deposit;
+  }
+
+  async update(id, updateFn) {
+    const existing = this.deposits.get(id);
+    if (!existing) {
+      throw new Error(`Deposit ${id} not found`);
+    }
+    const updated = updateFn(existing);
+    this.deposits.set(id, updated);
+    return updated;
+  }
 }
 
 class MemoryNotificationService {
@@ -270,6 +291,7 @@ function initializeServices() {
   services = {
     env,
     logger,
+    repository,
     depositService,
     webhookHandler,
     jobHealthStore,
@@ -329,7 +351,7 @@ export default async function handler(req, res) {
     }
 
     // Initialize services only after auth check
-    const { logger, depositService, webhookHandler, jobHealthStore, webhookRetryQueue, notificationService } = initializeServices();
+    const { logger, repository, depositService, webhookHandler, jobHealthStore, webhookRetryQueue, notificationService } = initializeServices();
 
     // Metrics endpoint
     if (pathname === '/metrics') {
@@ -353,10 +375,10 @@ export default async function handler(req, res) {
       if (pathname === '/api/deposits') {
         if (method === 'GET') {
           const { status, customerId, limit } = req.query || {};
-          const result = await depositService.listDeposits({ 
-            status, 
-            customerId, 
-            limit: limit ? parseInt(limit) : 100 
+          const result = await repository.findAll({
+            status,
+            customerId,
+            limit: limit ? parseInt(limit) : 100
           });
           return res.status(200).json(result);
         }

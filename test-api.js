@@ -1,6 +1,6 @@
 const https = require('https');
 
-const baseUrl = 'https://stripe-deposit-lyw429imw-phuket1.vercel.app';
+const baseUrl = 'https://stripe-deposit.vercel.app';
 const authToken = '+wHLpI2G1rV+VFmAk7mdomTDVf+glkljgtJiksmRft8=';
 
 async function testEndpoint(path, headers = {}) {
