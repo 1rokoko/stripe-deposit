@@ -12,8 +12,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const pathname = url;
-    
+    // Handle both /api/demo and /demo paths
+    const pathname = url.replace('/api/demo', '/demo').replace(/^$/, '/demo');
+
     // Demo API endpoints
     if (pathname === '/demo' || pathname === '/') {
       return res.status(200).json({
