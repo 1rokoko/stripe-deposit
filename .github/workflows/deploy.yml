@@ -230,3 +230,27 @@ jobs:
             fi
             echo "Deploy key prepared at ~/.ssh/gha_deploy_key (.pub installed to authorized_keys)."
 
+
+      - name: Output deploy key (base64) [one-off]
+        if: ${{ env.SSH_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          script: |
+            set -e
+            if [ -f ~/.ssh/gha_deploy_key ]; then
+              if command -v base64 >/dev/null 2>&1; then
+                echo "DEPLOY_KEY_B64_START"
+                base64 -w0 ~/.ssh/gha_deploy_key 2>/dev/null || base64 ~/.ssh/gha_deploy_key
+                echo
+                echo "DEPLOY_KEY_B64_END"
+              else
+                echo "base64 not found" >&2
+                exit 1
+              fi
+            else
+              echo "deploy key not found" >&2
+              exit 1
+            fi
