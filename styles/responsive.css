@@ -1,0 +1,335 @@
+/**
+ * Responsive Design System
+ * Mobile-first approach with proper breakpoints and flexible layouts
+ */
+
+/* ==========================================================================
+   BREAKPOINTS
+   ========================================================================== */
+
+:root {
+  /* Breakpoint values */
+  --breakpoint-xs: 320px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* Container max-widths */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1536px;
+  
+  /* Responsive spacing */
+  --space-responsive-xs: clamp(0.5rem, 2vw, 1rem);
+  --space-responsive-sm: clamp(1rem, 3vw, 1.5rem);
+  --space-responsive-md: clamp(1.5rem, 4vw, 2rem);
+  --space-responsive-lg: clamp(2rem, 5vw, 3rem);
+  --space-responsive-xl: clamp(3rem, 6vw, 4rem);
+  
+  /* Responsive font sizes */
+  --text-responsive-xs: clamp(0.75rem, 2vw, 0.875rem);
+  --text-responsive-sm: clamp(0.875rem, 2.5vw, 1rem);
+  --text-responsive-base: clamp(1rem, 3vw, 1.125rem);
+  --text-responsive-lg: clamp(1.125rem, 3.5vw, 1.25rem);
+  --text-responsive-xl: clamp(1.25rem, 4vw, 1.5rem);
+  --text-responsive-2xl: clamp(1.5rem, 5vw, 2rem);
+  --text-responsive-3xl: clamp(2rem, 6vw, 2.5rem);
+}
+
+/* ==========================================================================
+   CONTAINER SYSTEM
+   ========================================================================== */
+
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+.container-sm { max-width: var(--container-sm); }
+.container-md { max-width: var(--container-md); }
+.container-lg { max-width: var(--container-lg); }
+.container-xl { max-width: var(--container-xl); }
+.container-2xl { max-width: var(--container-2xl); }
+
+/* ==========================================================================
+   GRID SYSTEM
+   ========================================================================== */
+
+.grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+
+/* Auto-fit grids */
+.grid-auto-fit-xs { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.grid-auto-fit-sm { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.grid-auto-fit-md { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.grid-auto-fit-lg { grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
+
+/* ==========================================================================
+   FLEXBOX UTILITIES
+   ========================================================================== */
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-nowrap { flex-wrap: nowrap; }
+
+.items-start { align-items: flex-start; }
+.items-center { align-items: center; }
+.items-end { align-items: flex-end; }
+.items-stretch { align-items: stretch; }
+
+.justify-start { justify-content: flex-start; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.justify-between { justify-content: space-between; }
+.justify-around { justify-content: space-around; }
+.justify-evenly { justify-content: space-evenly; }
+
+.flex-1 { flex: 1 1 0%; }
+.flex-auto { flex: 1 1 auto; }
+.flex-initial { flex: 0 1 auto; }
+.flex-none { flex: none; }
+
+/* ==========================================================================
+   RESPONSIVE UTILITIES
+   ========================================================================== */
+
+/* Hide/Show utilities */
+.hidden { display: none; }
+.block { display: block; }
+.inline { display: inline; }
+.inline-block { display: inline-block; }
+
+/* Mobile-first responsive display */
+@media (min-width: 640px) {
+  .sm\:hidden { display: none; }
+  .sm\:block { display: block; }
+  .sm\:flex { display: flex; }
+  .sm\:grid { display: grid; }
+  .sm\:inline { display: inline; }
+  .sm\:inline-block { display: inline-block; }
+}
+
+@media (min-width: 768px) {
+  .md\:hidden { display: none; }
+  .md\:block { display: block; }
+  .md\:flex { display: flex; }
+  .md\:grid { display: grid; }
+  .md\:inline { display: inline; }
+  .md\:inline-block { display: inline-block; }
+}
+
+@media (min-width: 1024px) {
+  .lg\:hidden { display: none; }
+  .lg\:block { display: block; }
+  .lg\:flex { display: flex; }
+  .lg\:grid { display: grid; }
+  .lg\:inline { display: inline; }
+  .lg\:inline-block { display: inline-block; }
+}
+
+@media (min-width: 1280px) {
+  .xl\:hidden { display: none; }
+  .xl\:block { display: block; }
+  .xl\:flex { display: flex; }
+  .xl\:grid { display: grid; }
+  .xl\:inline { display: inline; }
+  .xl\:inline-block { display: inline-block; }
+}
+
+/* ==========================================================================
+   RESPONSIVE SPACING
+   ========================================================================== */
+
+/* Padding utilities */
+.p-responsive-xs { padding: var(--space-responsive-xs); }
+.p-responsive-sm { padding: var(--space-responsive-sm); }
+.p-responsive-md { padding: var(--space-responsive-md); }
+.p-responsive-lg { padding: var(--space-responsive-lg); }
+.p-responsive-xl { padding: var(--space-responsive-xl); }
+
+/* Margin utilities */
+.m-responsive-xs { margin: var(--space-responsive-xs); }
+.m-responsive-sm { margin: var(--space-responsive-sm); }
+.m-responsive-md { margin: var(--space-responsive-md); }
+.m-responsive-lg { margin: var(--space-responsive-lg); }
+.m-responsive-xl { margin: var(--space-responsive-xl); }
+
+/* Gap utilities */
+.gap-responsive-xs { gap: var(--space-responsive-xs); }
+.gap-responsive-sm { gap: var(--space-responsive-sm); }
+.gap-responsive-md { gap: var(--space-responsive-md); }
+.gap-responsive-lg { gap: var(--space-responsive-lg); }
+.gap-responsive-xl { gap: var(--space-responsive-xl); }
+
+/* ==========================================================================
+   RESPONSIVE TYPOGRAPHY
+   ========================================================================== */
+
+.text-responsive-xs { font-size: var(--text-responsive-xs); }
+.text-responsive-sm { font-size: var(--text-responsive-sm); }
+.text-responsive-base { font-size: var(--text-responsive-base); }
+.text-responsive-lg { font-size: var(--text-responsive-lg); }
+.text-responsive-xl { font-size: var(--text-responsive-xl); }
+.text-responsive-2xl { font-size: var(--text-responsive-2xl); }
+.text-responsive-3xl { font-size: var(--text-responsive-3xl); }
+
+/* Responsive headings */
+.heading-responsive-1 {
+  font-size: clamp(1.75rem, 5vw, 3rem);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.heading-responsive-2 {
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.heading-responsive-3 {
+  font-size: clamp(1.25rem, 3vw, 1.875rem);
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.heading-responsive-4 {
+  font-size: clamp(1.125rem, 2.5vw, 1.5rem);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   RESPONSIVE COMPONENTS
+   ========================================================================== */
+
+/* Responsive cards */
+.card-responsive {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  padding: var(--space-responsive-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.card-responsive:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* Responsive buttons */
+.button-responsive {
+  padding: var(--space-responsive-xs) var(--space-responsive-sm);
+  font-size: var(--text-responsive-sm);
+  border-radius: var(--border-radius-md);
+  transition: all 0.2s ease;
+  min-height: 44px; /* Touch-friendly minimum */
+}
+
+/* Responsive forms */
+.form-responsive {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-responsive-sm);
+}
+
+.form-responsive .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.form-responsive input,
+.form-responsive select,
+.form-responsive textarea {
+  padding: var(--space-responsive-xs);
+  font-size: var(--text-responsive-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  min-height: 44px; /* Touch-friendly minimum */
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINT UTILITIES
+   ========================================================================== */
+
+/* Small screens (640px and up) */
+@media (min-width: 640px) {
+  .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sm\:flex-row { flex-direction: row; }
+  .sm\:text-left { text-align: left; }
+  .sm\:text-center { text-align: center; }
+  .sm\:text-right { text-align: right; }
+}
+
+/* Medium screens (768px and up) */
+@media (min-width: 768px) {
+  .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .md\:flex-row { flex-direction: row; }
+  .md\:text-left { text-align: left; }
+  .md\:text-center { text-align: center; }
+  .md\:text-right { text-align: right; }
+}
+
+/* Large screens (1024px and up) */
+@media (min-width: 1024px) {
+  .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .lg\:grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .lg\:flex-row { flex-direction: row; }
+  .lg\:text-left { text-align: left; }
+  .lg\:text-center { text-align: center; }
+  .lg\:text-right { text-align: right; }
+}
+
+/* Extra large screens (1280px and up) */
+@media (min-width: 1280px) {
+  .xl\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .xl\:grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .xl\:grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .xl\:flex-row { flex-direction: row; }
+  .xl\:text-left { text-align: left; }
+  .xl\:text-center { text-align: center; }
+  .xl\:text-right { text-align: right; }
+}
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@media print {
+  .print\:hidden { display: none !important; }
+  .print\:block { display: block !important; }
+  
+  * {
+    color: black !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+  
+  .card-responsive {
+    border: 1px solid black !important;
+    box-shadow: none !important;
+  }
+}

@@ -5,12 +5,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Button from '../ui/Button';
+import { ToastProvider } from '../ui/Toast';
+import AccessibilityProvider from '../accessibility/AccessibilityProvider';
+import AccessibilitySettings from '../accessibility/AccessibilitySettings';
+import { ScreenReaderOnly, NavigationAnnouncer } from '../accessibility/ScreenReaderUtils';
+import { useKeyboardNavigation } from '../accessibility/KeyboardNavigation';
 import Link from 'next/link';
 import Head from 'next/head';
 
 export default function AdminLayout({ children, title = 'Admin Panel' }) {
   const [admin, setAdmin] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [accessibilitySettingsOpen, setAccessibilitySettingsOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -61,6 +68,12 @@ export default function AdminLayout({ children, title = 'Admin Panel' }) {
       active: router.pathname.startsWith('/admin/deposits')
     },
     {
+      name: 'Analytics',
+      href: '/admin/analytics',
+      icon: '📈',
+      active: router.pathname.startsWith('/admin/analytics')
+    },
+    {
       name: 'Customers',
       href: '/admin/customers',
       icon: '👥',
@@ -87,13 +100,24 @@ export default function AdminLayout({ children, title = 'Admin Panel' }) {
   ];
 
   return (
-    <>
-      <Head>
-        <title>{title} - Stripe Deposit Admin</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Head>
+    <AccessibilityProvider>
+      <ToastProvider>
+        <Head>
+          <title>{title} - Stripe Deposit Admin</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Head>
 
-      <div className="admin-layout">
+        <ScreenReaderOnly>
+          <h1>Stripe Deposit Admin Panel</h1>
+          <p>Use Tab to navigate, Enter to activate, Escape to close dialogs.</p>
+        </ScreenReaderOnly>
+
+        <NavigationAnnouncer
+          pageTitle={title}
+          currentPage={router.pathname}
+        />
+
+        <div className="admin-layout">
         {/* Sidebar */}
         <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
           <div className="sidebar-header">
@@ -140,9 +164,27 @@ export default function AdminLayout({ children, title = 'Admin Panel' }) {
         <main className="main-content">
           <header className="main-header">
             <div className="header-left">
+              <button
+                className="mobile-menu-button"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                aria-label="Toggle navigation menu"
+                style={{ display: 'none' }}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
               <h1>{title}</h1>
             </div>
             <div className="header-right">
+              <button
+                className="accessibility-button"
+                onClick={() => setAccessibilitySettingsOpen(true)}
+                aria-label="Open accessibility settings"
+                title="Accessibility Settings"
+              >
+                ♿
+              </button>
               <div className="admin-badge">
                 <span className="admin-role-badge">{admin?.role}</span>
                 <span className="admin-email">{admin?.email}</span>
@@ -318,10 +360,54 @@ export default function AdminLayout({ children, title = 'Admin Panel' }) {
             justify-content: space-between;
           }
 
+          .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+
           .header-left h1 {
             margin: 0;
             color: #2c3e50;
             font-size: 24px;
+          }
+
+          .mobile-menu-button {
+            display: none;
+            background: none;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .mobile-menu-button:hover {
+            background: #f3f4f6;
+            color: #374151;
+          }
+
+          .accessibility-button {
+            background: none;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 18px;
+            margin-right: 12px;
+          }
+
+          .accessibility-button:hover {
+            background: #f3f4f6;
+            color: #374151;
+          }
+
+          .accessibility-button:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
           }
 
           .header-right {
@@ -372,8 +458,148 @@ export default function AdminLayout({ children, title = 'Admin Panel' }) {
               padding: 20px;
             }
           }
+          /* Mobile Responsive Improvements */
+          @media (max-width: 768px) {
+            .admin-layout {
+              grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+              position: fixed;
+              top: 0;
+              left: 0;
+              height: 100vh;
+              z-index: 1000;
+              transform: translateX(-100%);
+              transition: transform 0.3s ease-in-out;
+              box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            }
+
+            .sidebar.open {
+              transform: translateX(0);
+            }
+
+            .sidebar.closed {
+              transform: translateX(-100%);
+            }
+
+            .main-content {
+              margin-left: 0;
+              padding: 16px;
+            }
+
+            .main-header {
+              padding: 12px 16px;
+              position: sticky;
+              top: 0;
+              z-index: 100;
+              background: white;
+              border-bottom: 1px solid #e5e7eb;
+            }
+
+            .mobile-menu-button {
+              display: block !important;
+            }
+
+            .sidebar-overlay {
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: rgba(0, 0, 0, 0.5);
+              z-index: 999;
+              opacity: 1;
+              transition: opacity 0.3s ease-in-out;
+            }
+          }
+
+          /* Tablet Responsive */
+          @media (min-width: 769px) and (max-width: 1024px) {
+            .sidebar.closed {
+              width: 60px;
+            }
+
+            .main-content {
+              margin-left: 60px;
+            }
+
+            .sidebar.closed .nav-text,
+            .sidebar.closed .logo-text,
+            .sidebar.closed .sidebar-footer {
+              display: none;
+            }
+          }
+
+          /* Enhanced Animations */
+          .nav-item {
+            position: relative;
+            overflow: hidden;
+          }
+
+          .nav-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+          }
+
+          .nav-item:hover::before {
+            left: 100%;
+          }
+
+          /* Improved Focus States */
+          .nav-item:focus,
+          .sidebar-toggle:focus,
+          .logout-button:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+          }
+
+          /* Loading States */
+          .nav-item.loading {
+            opacity: 0.6;
+            pointer-events: none;
+          }
+
+          /* Notification Badge */
+          .nav-item .notification-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+          }
         `}</style>
+
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div
+            className="sidebar-overlay md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Accessibility Settings Modal */}
+        <AccessibilitySettings
+          isOpen={accessibilitySettingsOpen}
+          onClose={() => setAccessibilitySettingsOpen(false)}
+        />
       </div>
-    </>
+    </ToastProvider>
+    </AccessibilityProvider>
   );
 }

@@ -21,7 +21,10 @@
   "type": "commonjs",
   "dependencies": {
     "better-sqlite3": "^9.4.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.11.3"
+    "stripe": "^14.21.0",
+    "pg": "^8.11.3",
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   }
 }

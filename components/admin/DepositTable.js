@@ -4,6 +4,9 @@
  */
 
 import { useState } from 'react';
+import { TableAnnouncer, LoadingAnnouncer } from '../accessibility/ScreenReaderUtils';
+import { useKeyboardNavigation } from '../accessibility/KeyboardNavigation';
+import Badge from '../ui/Badge';
 
 export default function DepositTable({ 
   deposits, 

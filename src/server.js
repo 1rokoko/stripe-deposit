@@ -457,6 +457,344 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Analytics generation functions
+async function generateAnalytics(startDate, endDate) {
+  const [
+    summary,
+    depositsOverTime,
+    revenueOverTime,
+    statusDistribution,
+    averageAmountOverTime,
+    topCustomers,
+    performance
+  ] = await Promise.all([
+    generateSummary(startDate, endDate),
+    generateDepositsOverTime(startDate, endDate),
+    generateRevenueOverTime(startDate, endDate),
+    generateStatusDistribution(startDate, endDate),
+    generateAverageAmountOverTime(startDate, endDate),
+    generateTopCustomers(startDate, endDate),
+    generatePerformanceMetrics(startDate, endDate)
+  ]);
+
+  return {
+    summary,
+    depositsOverTime,
+    revenueOverTime,
+    statusDistribution,
+    averageAmountOverTime,
+    topCustomers,
+    performance,
+    timestamp: new Date().toISOString()
+  };
+}
+
+async function generateSummary(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  const totalDeposits = deposits.length;
+  const totalAmount = deposits.reduce((sum, d) => sum + d.amount, 0);
+  const averageAmount = totalAmount / totalDeposits || 0;
+  const successfulDeposits = deposits.filter(d => d.status === 'captured').length;
+  const successRate = totalDeposits > 0 ? Math.round((successfulDeposits / totalDeposits) * 100) : 0;
+
+  return {
+    totalDeposits,
+    totalAmount,
+    averageAmount,
+    successRate,
+    pendingDeposits: deposits.filter(d => d.status === 'pending').length,
+    failedDeposits: deposits.filter(d => d.status === 'failed').length,
+    capturedDeposits: successfulDeposits
+  };
+}
+
+async function generateDepositsOverTime(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  // Группировка по дням
+  const dailyData = {};
+  deposits.forEach(deposit => {
+    const date = new Date(deposit.created_at).toISOString().split('T')[0];
+    dailyData[date] = (dailyData[date] || 0) + 1;
+  });
+
+  const labels = Object.keys(dailyData).sort();
+  const data = labels.map(date => dailyData[date]);
+
+  return {
+    labels,
+    datasets: [{
+      label: 'Deposits',
+      data,
+      borderColor: 'rgb(75, 192, 192)',
+      backgroundColor: 'rgba(75, 192, 192, 0.2)',
+      tension: 0.1
+    }]
+  };
+}
+
+async function generateRevenueOverTime(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  // Группировка по дням с суммированием
+  const dailyRevenue = {};
+  deposits.forEach(deposit => {
+    if (deposit.status === 'captured') {
+      const date = new Date(deposit.created_at).toISOString().split('T')[0];
+      dailyRevenue[date] = (dailyRevenue[date] || 0) + deposit.amount;
+    }
+  });
+
+  const labels = Object.keys(dailyRevenue).sort();
+  const data = labels.map(date => dailyRevenue[date] / 100); // Convert to dollars
+
+  return {
+    labels,
+    datasets: [{
+      label: 'Revenue ($)',
+      data,
+      backgroundColor: 'rgba(54, 162, 235, 0.5)',
+      borderColor: 'rgba(54, 162, 235, 1)',
+      borderWidth: 1
+    }]
+  };
+}
+
+async function generateStatusDistribution(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  const statusCounts = {};
+  deposits.forEach(deposit => {
+    statusCounts[deposit.status] = (statusCounts[deposit.status] || 0) + 1;
+  });
+
+  return {
+    labels: Object.keys(statusCounts),
+    datasets: [{
+      data: Object.values(statusCounts),
+      backgroundColor: [
+        '#FF6384',
+        '#36A2EB',
+        '#FFCE56',
+        '#4BC0C0',
+        '#9966FF'
+      ]
+    }]
+  };
+}
+
+async function generateAverageAmountOverTime(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  // Группировка по дням с расчетом среднего
+  const dailyAmounts = {};
+  deposits.forEach(deposit => {
+    const date = new Date(deposit.created_at).toISOString().split('T')[0];
+    if (!dailyAmounts[date]) {
+      dailyAmounts[date] = { total: 0, count: 0 };
+    }
+    dailyAmounts[date].total += deposit.amount;
+    dailyAmounts[date].count += 1;
+  });
+
+  const labels = Object.keys(dailyAmounts).sort();
+  const data = labels.map(date => {
+    const dayData = dailyAmounts[date];
+    return dayData.count > 0 ? (dayData.total / dayData.count) / 100 : 0;
+  });
+
+  return {
+    labels,
+    datasets: [{
+      label: 'Average Amount ($)',
+      data,
+      borderColor: 'rgb(255, 99, 132)',
+      backgroundColor: 'rgba(255, 99, 132, 0.2)',
+      tension: 0.1
+    }]
+  };
+}
+
+async function generateTopCustomers(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  const customerStats = {};
+  deposits.forEach(deposit => {
+    const customerId = deposit.customer_id || 'unknown';
+    if (!customerStats[customerId]) {
+      customerStats[customerId] = {
+        id: customerId,
+        name: deposit.customer?.name || `Customer ${customerId.substring(0, 8)}`,
+        email: deposit.customer?.email || 'N/A',
+        depositCount: 0,
+        totalAmount: 0,
+        successfulDeposits: 0
+      };
+    }
+
+    customerStats[customerId].depositCount++;
+    customerStats[customerId].totalAmount += deposit.amount;
+    if (deposit.status === 'captured') {
+      customerStats[customerId].successfulDeposits++;
+    }
+  });
+
+  // Добавление success rate и сортировка
+  const topCustomers = Object.values(customerStats)
+    .map(customer => ({
+      ...customer,
+      successRate: customer.depositCount > 0 ?
+        Math.round((customer.successfulDeposits / customer.depositCount) * 100) : 0
+    }))
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+    .slice(0, 10);
+
+  return topCustomers;
+}
+
+async function generatePerformanceMetrics(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  // Success rate
+  const successfulDeposits = deposits.filter(d => d.status === 'captured').length;
+  const successRate = deposits.length > 0 ?
+    Math.round((successfulDeposits / deposits.length) * 100) : 0;
+
+  // Error rate
+  const failedDeposits = deposits.filter(d => d.status === 'failed').length;
+  const errorRate = deposits.length > 0 ?
+    Math.round((failedDeposits / deposits.length) * 100) : 0;
+
+  // Peak hour analysis
+  const hourCounts = {};
+  deposits.forEach(deposit => {
+    const hour = new Date(deposit.created_at).getHours();
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+  });
+
+  const peakHour = Object.entries(hourCounts)
+    .sort(([,a], [,b]) => b - a)[0]?.[0] || 0;
+
+  // Average processing time (mock data for now)
+  const avgProcessingTime = Math.round(Math.random() * 5000 + 1000);
+
+  return {
+    avgProcessingTime,
+    successRate,
+    errorRate,
+    peakHour: parseInt(peakHour)
+  };
+}
+
+async function getDepositsByDateRange(startDate, endDate) {
+  const allDeposits = await depositService.listDeposits();
+
+  if (!startDate || !endDate) {
+    return allDeposits;
+  }
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  return allDeposits.filter(deposit => {
+    const depositDate = new Date(deposit.created_at);
+    return depositDate >= start && depositDate <= end;
+  });
+}
+
+// Report generation functions
+async function generateDepositsReport(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  return deposits.map(deposit => ({
+    id: deposit.id,
+    amount: deposit.amount / 100,
+    status: deposit.status,
+    customer_name: deposit.customer?.name || 'N/A',
+    customer_email: deposit.customer?.email || 'N/A',
+    customer_id: deposit.customer_id || 'N/A',
+    created_at: deposit.created_at,
+    captured_at: deposit.captured_at || 'N/A',
+    released_at: deposit.released_at || 'N/A',
+    payment_intent_id: deposit.payment_intent_id || 'N/A',
+    currency: deposit.currency || 'usd'
+  }));
+}
+
+async function generateCustomersReport(startDate, endDate) {
+  const deposits = await getDepositsByDateRange(startDate, endDate);
+
+  const customerStats = {};
+  deposits.forEach(deposit => {
+    const customerId = deposit.customer_id || 'unknown';
+    if (!customerStats[customerId]) {
+      customerStats[customerId] = {
+        customer_id: customerId,
+        customer_name: deposit.customer?.name || 'N/A',
+        customer_email: deposit.customer?.email || 'N/A',
+        total_deposits: 0,
+        total_amount: 0,
+        successful_deposits: 0,
+        failed_deposits: 0,
+        pending_deposits: 0,
+        first_deposit: deposit.created_at,
+        last_deposit: deposit.created_at
+      };
+    }
+
+    const stats = customerStats[customerId];
+    stats.total_deposits++;
+    stats.total_amount += deposit.amount / 100;
+
+    if (deposit.status === 'captured') {
+      stats.successful_deposits++;
+    } else if (deposit.status === 'failed') {
+      stats.failed_deposits++;
+    } else if (deposit.status === 'pending') {
+      stats.pending_deposits++;
+    }
+
+    if (new Date(deposit.created_at) < new Date(stats.first_deposit)) {
+      stats.first_deposit = deposit.created_at;
+    }
+    if (new Date(deposit.created_at) > new Date(stats.last_deposit)) {
+      stats.last_deposit = deposit.created_at;
+    }
+  });
+
+  return Object.values(customerStats).map(customer => ({
+    ...customer,
+    success_rate: customer.total_deposits > 0 ?
+      Math.round((customer.successful_deposits / customer.total_deposits) * 100) : 0,
+    average_deposit: customer.total_deposits > 0 ?
+      (customer.total_amount / customer.total_deposits).toFixed(2) : 0
+  }));
+}
+
+function generateCSV(data) {
+  if (!data || data.length === 0) {
+    return 'No data available';
+  }
+
+  const headers = Object.keys(data[0]);
+  const csvRows = [headers.join(',')];
+
+  data.forEach(row => {
+    const values = headers.map(header => {
+      const value = row[header];
+      // Escape commas and quotes in CSV
+      if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    });
+    csvRows.push(values.join(','));
+  });
+
+  return csvRows.join('\n');
+}
+
 // Admin routes handler
 async function handleAdminRoutes(req, res, pathname) {
   try {
@@ -618,6 +956,22 @@ async function handleAdminRoutes(req, res, pathname) {
       return;
     }
 
+    // Admin analytics
+    if (pathname === '/api/admin/analytics' && req.method === 'POST') {
+      logAdminAction(adminAuth.user, 'VIEW_ANALYTICS', {
+        ip: req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
+      });
+
+      const body = await parseJsonBody(req);
+      const { startDate, endDate } = body;
+
+      const analytics = await generateAnalytics(startDate, endDate);
+
+      sendJson(res, 200, analytics);
+      return;
+    }
+
     // Admin bulk operations
     if (pathname === '/api/admin/deposits/bulk' && req.method === 'POST') {
       const body = await parseJsonBody(req);
@@ -630,11 +984,77 @@ async function handleAdminRoutes(req, res, pathname) {
 
     // Admin export
     if (pathname === '/api/admin/deposits/export' && req.method === 'POST') {
-      const body = await parseJsonBody(req);
-      sendJson(res, 400, {
-        error: 'Export not implemented yet',
-        code: 'NOT_IMPLEMENTED'
+      logAdminAction(adminAuth.user, 'EXPORT_DEPOSITS', {
+        ip: req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
       });
+
+      const body = await parseJsonBody(req);
+      const { format = 'json', filters = {} } = body;
+
+      const deposits = await depositService.listDeposits();
+
+      if (format === 'csv') {
+        const csvData = generateCSV(deposits);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="deposits-export.csv"');
+        res.end(csvData);
+      } else if (format === 'json') {
+        sendJson(res, 200, {
+          success: true,
+          data: deposits,
+          exportedAt: new Date().toISOString(),
+          totalRecords: deposits.length
+        });
+      } else {
+        sendJson(res, 400, {
+          error: 'Unsupported format. Use csv or json',
+          code: 'INVALID_FORMAT'
+        });
+      }
+      return;
+    }
+
+    // Admin reports generation
+    if (pathname === '/api/admin/reports/generate' && req.method === 'POST') {
+      logAdminAction(adminAuth.user, 'GENERATE_REPORT', {
+        ip: req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
+      });
+
+      const body = await parseJsonBody(req);
+      const { reportType, startDate, endDate, format = 'json' } = body;
+
+      let reportData;
+      switch (reportType) {
+        case 'deposits':
+          reportData = await generateDepositsReport(startDate, endDate);
+          break;
+        case 'customers':
+          reportData = await generateCustomersReport(startDate, endDate);
+          break;
+        case 'analytics':
+          reportData = await generateAnalytics(startDate, endDate);
+          break;
+        default:
+          sendJson(res, 400, { error: 'Invalid report type' });
+          return;
+      }
+
+      if (format === 'csv') {
+        const csvData = generateCSV(reportData);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${reportType}-report.csv"`);
+        res.end(csvData);
+      } else {
+        sendJson(res, 200, {
+          success: true,
+          reportType,
+          data: reportData,
+          generatedAt: new Date().toISOString(),
+          dateRange: { startDate, endDate }
+        });
+      }
       return;
     }
 

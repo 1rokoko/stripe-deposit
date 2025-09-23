@@ -9,6 +9,15 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import MetricsCard from '../../components/admin/MetricsCard';
 import RecentDeposits from '../../components/admin/RecentDeposits';
 import { requireAdminAuthSSR } from '../../lib/admin-auth';
+import {
+  ResponsiveContainer,
+  ResponsiveGrid,
+  ResponsiveCard,
+  ResponsiveHeading,
+  useBreakpoint
+} from '../../components/layout/ResponsiveLayout';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
 
 export default function AdminDashboard({ admin }) {
   const [metrics, setMetrics] = useState(null);
