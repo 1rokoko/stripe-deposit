@@ -302,7 +302,10 @@ function initializeServices() {
   return services;
 }
 
-// Utility functions
+// Import enhanced auth middleware
+const { createAuthMiddleware } = require('../src/auth/authMiddleware');
+
+// Utility functions (keeping for backward compatibility)
 function isAuthorized(req, apiToken) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -346,8 +349,15 @@ export default async function handler(req, res) {
     }
 
     // All other routes require authentication
-    if (!isAuthorized(req, env.API_AUTH_TOKEN)) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    // Create auth middleware instance
+    const authMiddleware = createAuthMiddleware({
+      apiToken: env.API_AUTH_TOKEN,
+      enableLogging: true
+    });
+
+    // Check authorization with enhanced middleware
+    if (!authMiddleware.requireAuth(req, res)) {
+      return; // Response already sent by middleware
     }
 
     // Initialize services only after auth check
