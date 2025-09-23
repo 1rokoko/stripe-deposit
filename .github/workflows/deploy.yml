@@ -41,7 +41,7 @@ jobs:
           git archive --format=tar HEAD | gzip > release.tar.gz
 
       - name: Prepare SSH key (if provided)
-        if: ${{ secrets.SSH_KEY != '' }}
+        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
         id: prepare_ssh
         run: |
           set -euo pipefail
@@ -66,7 +66,7 @@ jobs:
           fi
 
       - name: Upload archive to server (key)
-        if: ${{ secrets.SSH_KEY != '' }}
+        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -76,7 +76,7 @@ jobs:
           target: /tmp/stripe-deposit.tar.gz
 
       - name: Upload archive to server (password)
-        if: ${{ secrets.SSH_KEY == '' && secrets.SSH_PASSWORD != '' }}
+        if: ${{ secrets.SSH_PASSWORD != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -86,7 +86,7 @@ jobs:
           target: /tmp/stripe-deposit.tar.gz
 
       - name: Deploy on server (key)
-        if: ${{ secrets.SSH_KEY != '' }}
+        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -129,7 +129,7 @@ jobs:
             fi
 
       - name: Deploy on server (password)
-        if: ${{ secrets.SSH_KEY == '' && secrets.SSH_PASSWORD != '' }}
+        if: ${{ secrets.SSH_PASSWORD != '' }}
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -170,3 +170,55 @@ jobs:
                 nohup npm start >/var/log/stripe-deposit.log 2>&1 &
               fi
             fi
+
+      - name: Verify on server (password)
+        if: ${{ secrets.SSH_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ secrets.REMOTE_DEPLOY_DIR }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
+            echo "CHECK#1: process/container status"
+            if command -v docker >/dev/null 2>&1; then docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps || docker compose ps || docker ps; else pgrep -fa node || true; fi
+            echo "CHECK#2: health endpoint"
+            if command -v curl >/dev/null 2>&1; then curl -sf http://localhost:3000/healthz | sed -e 's/.*/OK/'; else wget -qO- http://localhost:3000/healthz >/dev/null && echo OK || (echo "health check failed" >&2; exit 1); fi
+            echo "CHECK#3: metrics head"
+            if command -v curl >/dev/null 2>&1; then curl -s http://localhost:3000/metrics | head -n 5 || true; else wget -qO- http://localhost:3000/metrics | head -n 5 || true; fi
+
+      - name: Verify on server (key)
+        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key_path: ~/.ssh/deploy_key
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ secrets.REMOTE_DEPLOY_DIR }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
+            echo "CHECK#1: process/container status"
+            if command -v docker >/dev/null 2>&1; then docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps || docker compose ps || docker ps; else pgrep -fa node || true; fi
+            echo "CHECK#2: health endpoint"
+            if command -v curl >/dev/null 2>&1; then curl -sf http://localhost:3000/healthz | sed -e 's/.*/OK/'; else wget -qO- http://localhost:3000/healthz >/dev/null && echo OK || (echo "health check failed" >&2; exit 1); fi
+            echo "CHECK#3: metrics head"
+            if command -v curl >/dev/null 2>&1; then curl -s http://localhost:3000/metrics | head -n 5 || true; else wget -qO- http://localhost:3000/metrics | head -n 5 || true; fi
+
+      - name: Generate deploy key on server (password)
+        if: ${{ secrets.SSH_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            set -euo pipefail
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            if [ ! -f ~/.ssh/gha_deploy_key ]; then
+              ssh-keygen -t ed25519 -N "" -f ~/.ssh/gha_deploy_key
+              cat ~/.ssh/gha_deploy_key.pub >> ~/.ssh/authorized_keys
+              chmod 600 ~/.ssh/authorized_keys
+            fi
+            echo "Deploy key prepared at ~/.ssh/gha_deploy_key (.pub installed to authorized_keys)."
+
