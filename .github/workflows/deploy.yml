@@ -16,6 +16,14 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      REMOTE_DEPLOY_DIR_SECRET: ${{ secrets.REMOTE_DEPLOY_DIR }}
+      REMOTE_DEPLOY_DIR_VAR: ${{ vars.REMOTE_DEPLOY_DIR }}
+
 
     steps:
       - name: Checkout repository
@@ -41,12 +49,12 @@ jobs:
           git archive --format=tar HEAD | gzip > release.tar.gz
 
       - name: Prepare SSH key (if provided)
-        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
         id: prepare_ssh
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          KEY_CONTENT="${{ secrets.SSH_KEY }}"
+          KEY_CONTENT="${{ env.SSH_KEY }}"
           if echo "$KEY_CONTENT" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
             echo "$KEY_CONTENT" | tr -d '\r' > ~/.ssh/deploy_key
           else
@@ -61,42 +69,42 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          if [ -n "${{ secrets.SSH_HOST }}" ]; then
-            ssh-keyscan -T 5 -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          if [ -n "${{ env.SSH_HOST }}" ]; then
+            ssh-keyscan -T 5 -H "${{ env.SSH_HOST }}" >> ~/.ssh/known_hosts
           fi
 
       - name: Upload archive to server (key)
-        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
           key_path: ~/.ssh/deploy_key
           source: release.tar.gz
           target: /tmp/stripe-deposit.tar.gz
 
       - name: Upload archive to server (password)
-        if: ${{ secrets.SSH_PASSWORD != '' }}
+        if: ${{ env.SSH_PASSWORD != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
           source: release.tar.gz
           target: /tmp/stripe-deposit.tar.gz
 
       - name: Deploy on server (key)
-        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
           key_path: ~/.ssh/deploy_key
           script: |
             set -euo pipefail
-            DEPLOY_DIR="${{ secrets.REMOTE_DEPLOY_DIR }}"
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"
             if [ -z "$DEPLOY_DIR" ]; then
-              DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"
+              DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"
             fi
             if [ -z "$DEPLOY_DIR" ]; then
               DEPLOY_DIR="/root/deposit-stripe"
@@ -129,17 +137,17 @@ jobs:
             fi
 
       - name: Deploy on server (password)
-        if: ${{ secrets.SSH_PASSWORD != '' }}
+        if: ${{ env.SSH_PASSWORD != '' }}
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
           script: |
             set -euo pipefail
-            DEPLOY_DIR="${{ secrets.REMOTE_DEPLOY_DIR }}"
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"
             if [ -z "$DEPLOY_DIR" ]; then
-              DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"
+              DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"
             fi
             if [ -z "$DEPLOY_DIR" ]; then
               DEPLOY_DIR="/root/deposit-stripe"
@@ -172,15 +180,15 @@ jobs:
             fi
 
       - name: Verify on server (password)
-        if: ${{ secrets.SSH_PASSWORD != '' }}
+        if: ${{ env.SSH_PASSWORD != '' }}
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
           script: |
             set -euo pipefail
-            DEPLOY_DIR="${{ secrets.REMOTE_DEPLOY_DIR }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
             echo "CHECK#1: process/container status"
             if command -v docker >/dev/null 2>&1; then docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps || docker compose ps || docker ps; else pgrep -fa node || true; fi
             echo "CHECK#2: health endpoint"
@@ -189,15 +197,15 @@ jobs:
             if command -v curl >/dev/null 2>&1; then curl -s http://localhost:3000/metrics | head -n 5 || true; else wget -qO- http://localhost:3000/metrics | head -n 5 || true; fi
 
       - name: Verify on server (key)
-        if: ${{ secrets.SSH_PASSWORD == '' && secrets.SSH_KEY != '' }}
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
           key_path: ~/.ssh/deploy_key
           script: |
             set -euo pipefail
-            DEPLOY_DIR="${{ secrets.REMOTE_DEPLOY_DIR }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ vars.REMOTE_DEPLOY_DIR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
             echo "CHECK#1: process/container status"
             if command -v docker >/dev/null 2>&1; then docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps || docker compose ps || docker ps; else pgrep -fa node || true; fi
             echo "CHECK#2: health endpoint"
@@ -206,12 +214,12 @@ jobs:
             if command -v curl >/dev/null 2>&1; then curl -s http://localhost:3000/metrics | head -n 5 || true; else wget -qO- http://localhost:3000/metrics | head -n 5 || true; fi
 
       - name: Generate deploy key on server (password)
-        if: ${{ secrets.SSH_PASSWORD != '' }}
+        if: ${{ env.SSH_PASSWORD != '' }}
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
           script: |
             set -euo pipefail
             mkdir -p ~/.ssh && chmod 700 ~/.ssh
