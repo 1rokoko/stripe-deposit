@@ -1,13 +1,6 @@
 @echo off
-echo Installing dependencies...
-npm install
-
-echo Committing changes...
 git add .
 git commit -m "fix: add missing Stripe dependency and restore critical dependencies for serverless functions"
-
-echo Pushing to GitHub...
 git push origin main
-
 echo Done!
 pause
