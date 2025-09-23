@@ -1,8 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "buildCommand": "npm run build",
-  "framework": "nextjs",
   "functions": {
     "api/index.js": {
       "memory": 1024,
@@ -26,26 +24,30 @@
       "maxDuration": 10
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/healthz",
-      "destination": "/api/healthz"
+      "src": "/healthz",
+      "dest": "/api/healthz"
     },
     {
-      "source": "/metrics",
-      "destination": "/api/metrics"
+      "src": "/metrics",
+      "dest": "/api/metrics"
     },
     {
-      "source": "/api/demo/(.*)",
-      "destination": "/api/demo"
+      "src": "/api/demo(.*)",
+      "dest": "/api/demo"
     },
     {
-      "source": "/api/stripe/webhook",
-      "destination": "/api/stripe/webhook"
+      "src": "/api/stripe/webhook",
+      "dest": "/api/stripe/webhook"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
+      "src": "/api/(.*)",
+      "dest": "/api/index"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index"
     }
   ],
   "env": {
