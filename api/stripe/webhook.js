@@ -142,8 +142,12 @@ export default async function handler(req, res) {
     }
 
     try {
-      const event = verifyStripeSignature(rawBody, signature, env.STRIPE_WEBHOOK_SECRET);
-      await handler.handle(event);
+      const event = verifyStripeSignature({
+        payload: rawBody,
+        header: signature,
+        secret: env.STRIPE_WEBHOOK_SECRET
+      });
+      await handler.handleEvent(event);
 
       return res.status(200).json({ received: true });
     } catch (error) {
