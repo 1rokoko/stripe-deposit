@@ -3,10 +3,10 @@
  * Handles bulk operations on multiple deposits
  */
 
-import { requireAdminAuth, logAdminAction } from '../../../../lib/admin-auth';
-import { createDepositRepository } from '../../../../src/repositories/repositoryFactory';
-import { createStripeClient } from '../../../../src/stripe/stripeClient';
-import { loadEnv } from '../../../../src/config';
+const { requireAdminAuth, logAdminAction } = require('../../../../lib/admin-auth');
+const { createDepositRepository } = require('../../../../src/repositories/repositoryFactory');
+const { createStripeClient } = require('../../../../src/stripe/stripeClient');
+const { loadEnv } = require('../../../../src/config');
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -252,4 +252,4 @@ async function handleBulkCancel(deposit, stripeClient, repository, options) {
   };
 }
 
-export default requireAdminAuth(handler);
+module.exports = requireAdminAuth(handler);
