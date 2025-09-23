@@ -9,7 +9,9 @@
     "deposits:cli": "node scripts/deposits-cli.js",
     "notifications:cli": "node scripts/notifications-cli.js",
     "test": "node --test",
-    "test:e2e:stripe": "node scripts/stripe-cli-e2e.js"
+    "test:e2e:stripe": "node scripts/stripe-cli-e2e.js",
+    "build": "next build",
+    "dev": "next dev"
   },
   "keywords": [
     "stripe",
@@ -25,6 +27,8 @@
     "pg": "^8.11.3",
     "next": "^14.0.0",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^18.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^8.3.2"
   }
 }
