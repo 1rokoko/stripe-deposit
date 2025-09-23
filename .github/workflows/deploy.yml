@@ -81,7 +81,7 @@ jobs:
           username: ${{ env.SSH_USER }}
           key_path: ~/.ssh/deploy_key
           source: release.tar.gz
-          target: /tmp/stripe-deposit.tar.gz
+          target: /tmp/
 
       - name: Upload archive to server (password)
         if: ${{ env.SSH_PASSWORD != '' }}
@@ -91,7 +91,7 @@ jobs:
           username: ${{ env.SSH_USER }}
           password: ${{ env.SSH_PASSWORD }}
           source: release.tar.gz
-          target: /tmp/stripe-deposit.tar.gz
+          target: /tmp/
 
       - name: Deploy on server (key)
         if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
@@ -110,8 +110,8 @@ jobs:
               DEPLOY_DIR="/root/deposit-stripe"
             fi
             mkdir -p "$DEPLOY_DIR"
-            tar -xzf /tmp/stripe-deposit.tar.gz -C "$DEPLOY_DIR" --strip-components=1
-            rm -f /tmp/stripe-deposit.tar.gz
+            tar -xzf /tmp/release.tar.gz -C "$DEPLOY_DIR" --strip-components=1
+            rm -f /tmp/release.tar.gz
             cd "$DEPLOY_DIR"
             if command -v docker >/dev/null 2>&1; then
               if docker compose version >/dev/null 2>&1; then
@@ -153,8 +153,8 @@ jobs:
               DEPLOY_DIR="/root/deposit-stripe"
             fi
             mkdir -p "$DEPLOY_DIR"
-            tar -xzf /tmp/stripe-deposit.tar.gz -C "$DEPLOY_DIR" --strip-components=1
-            rm -f /tmp/stripe-deposit.tar.gz
+            tar -xzf /tmp/release.tar.gz -C "$DEPLOY_DIR" --strip-components=1
+            rm -f /tmp/release.tar.gz
             cd "$DEPLOY_DIR"
             if command -v docker >/dev/null 2>&1; then
               if docker compose version >/dev/null 2>&1; then
