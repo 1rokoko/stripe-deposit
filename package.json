@@ -11,7 +11,7 @@
     "reauth-worker": "node src/jobs/reauthorizationWorker.js",
     "deposits:cli": "node scripts/deposits-cli.js",
     "notifications:cli": "node scripts/notifications-cli.js",
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.js",
     "test:e2e:stripe": "node scripts/stripe-cli-e2e.js"
   },
   "keywords": [
