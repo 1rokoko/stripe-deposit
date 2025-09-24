@@ -1,4 +1,24 @@
-// Demo endpoint without Stripe dependency
+// Demo endpoint with shared repository
+const { createDepositRepository } = require('../src/repositories/repositoryFactory');
+
+// Repository factory function for serverless environment
+function createRepositoryForRequest() {
+  try {
+    console.log('Demo API: Creating repository with DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
+    const repository = createDepositRepository({
+      type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory
+    });
+    console.log('Demo API: ✅ Created repository instance:', repository.constructor.name);
+    return repository;
+  } catch (error) {
+    console.error('Demo API: ❌ Failed to create repository:', error.message);
+    console.error('Demo API: Falling back to MemoryDepositRepository');
+    // Fallback to inline memory repository
+    const { MemoryDepositRepository } = require('../src/repositories/memoryDepositRepository');
+    return new MemoryDepositRepository();
+  }
+}
+
 export default async function handler(req, res) {
   const { method, url } = req;
   
@@ -52,29 +72,21 @@ export default async function handler(req, res) {
     }
 
     if (pathname === '/demo/deposits') {
-      // Demo deposits data
-      const demoDeposits = [
-        {
-          id: 'dep_demo_001',
-          customerId: 'cus_demo_customer',
-          amount: 10000, // $100.00
-          currency: 'usd',
-          status: 'authorized',
-          paymentIntentId: 'pi_demo_intent_001',
-          createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-          metadata: { demo: true }
-        },
-        {
-          id: 'dep_demo_002', 
-          customerId: 'cus_demo_customer_2',
-          amount: 20000, // $200.00
-          currency: 'usd',
-          status: 'requires_action',
-          paymentIntentId: 'pi_demo_intent_002',
-          createdAt: new Date(Date.now() - 1800000).toISOString(), // 30 min ago
-          metadata: { demo: true }
-        }
-      ];
+      // Get deposits from shared repository
+      const repository = createRepositoryForRequest();
+      const deposits = await repository.list();
+
+      // Convert to demo format for compatibility
+      const demoDeposits = deposits.map(deposit => ({
+        id: deposit.id,
+        customerId: deposit.customerId,
+        amount: deposit.holdAmount, // Already in cents
+        currency: deposit.currency,
+        status: deposit.status,
+        paymentIntentId: deposit.verificationPaymentIntentId || deposit.activePaymentIntentId,
+        createdAt: deposit.createdAt,
+        metadata: { demo: true, ...deposit.metadata }
+      }));
 
       return res.status(200).json({
         deposits: demoDeposits,
@@ -87,31 +99,55 @@ export default async function handler(req, res) {
     const holdMatch = pathname.match(/^\/demo\/deposits\/hold\/(\d+)$/);
     if (holdMatch && method === 'POST') {
       const amount = parseInt(holdMatch[1]);
-      
-      if (![100, 200].includes(amount)) {
+
+      // Allow any amount for demo, not just 100/200
+      if (amount <= 0 || amount > 10000) {
         return res.status(400).json({
-          error: 'Invalid hold amount. Must be 100 or 200.',
+          error: 'Invalid hold amount. Must be between $1 and $10,000.',
           demo: true
         });
       }
 
-      const demoDeposit = {
-        id: `dep_demo_${Date.now()}`,
+      const repository = createRepositoryForRequest();
+      const now = new Date();
+      const depositId = `dep_demo_${Date.now()}`;
+
+      // Create deposit object in repository format
+      const deposit = {
+        id: depositId,
         customerId: req.body?.customerId || 'cus_demo_customer',
-        amount: amount * 100, // Convert to cents
+        paymentMethodId: `pm_demo_${Date.now()}`,
         currency: 'usd',
+        holdAmount: amount * 100, // Convert to cents
         status: 'authorized',
-        paymentIntentId: `pi_demo_${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        metadata: { 
+        verificationPaymentIntentId: `pi_verify_demo_${Date.now()}`,
+        activePaymentIntentId: `pi_demo_${Date.now()}`,
+        createdAt: now.toISOString(),
+        initialAuthorizationAt: now.toISOString(),
+        lastAuthorizationAt: now.toISOString(),
+        captureHistory: [],
+        authorizationHistory: [],
+        metadata: {
           demo: true,
-          ...req.body?.metadata 
+          ...req.body?.metadata
         }
       };
 
+      // Save to repository
+      await repository.create(deposit);
+
       return res.status(200).json({
         success: true,
-        deposit: demoDeposit,
+        deposit: {
+          id: deposit.id,
+          customerId: deposit.customerId,
+          amount: deposit.holdAmount, // Return in cents for compatibility
+          currency: deposit.currency,
+          status: deposit.status,
+          paymentIntentId: deposit.activePaymentIntentId,
+          createdAt: deposit.createdAt,
+          metadata: deposit.metadata
+        },
         message: `Demo $${amount} deposit hold created successfully`,
         note: 'This is a demo. No real payment was processed.'
       });

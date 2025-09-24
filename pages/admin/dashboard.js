@@ -45,6 +45,8 @@ export default function AdminDashboard() {
 
   const fetchDeposits = async () => {
     try {
+      setLoading(true);
+      setError('');
       const adminToken = localStorage.getItem('adminToken');
       if (!adminToken) return;
 
@@ -57,6 +59,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         const data = await response.json();
         setDeposits(data.deposits || []);
+        console.log('Fetched deposits:', data.deposits?.length || 0);
       } else if (response.status === 401) {
         handleLogout();
       } else {
@@ -64,6 +67,7 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       setError(err.message);
+      console.error('Error fetching deposits:', err);
     } finally {
       setLoading(false);
     }
@@ -316,9 +320,10 @@ export default function AdminDashboard() {
                 <h2 className="text-lg font-medium text-gray-900">Recent Deposits</h2>
                 <button
                   onClick={fetchDeposits}
-                  className="text-blue-600 hover:text-blue-800 text-sm"
+                  disabled={loading}
+                  className={`text-sm ${loading ? 'text-gray-400' : 'text-blue-600 hover:text-blue-800'}`}
                 >
-                  🔄 Refresh
+                  {loading ? '⏳ Loading...' : '🔄 Refresh'}
                 </button>
               </div>
             </div>
