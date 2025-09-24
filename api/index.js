@@ -19,8 +19,8 @@ function createRepositoryForRequest() {
     console.log('Admin API: DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
 
     const repository = createDepositRepository({
-      type: 'sqlite', // Force SQLite for reliable persistence
-      filePath: '/tmp/stripe-deposit.db' // Use same file as demo API
+      type: 'file', // Use simple file-based persistence for Vercel
+      filePath: '/tmp/stripe-deposits.json' // Same file as demo API
     });
     console.log('Admin API: ✅ Created repository instance:', repository.constructor.name);
     return repository;

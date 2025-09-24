@@ -53,6 +53,11 @@ function createDepositRepository(options = {}) {
       repository = new SqliteDepositRepository(repoOptions);
       break;
 
+    case 'file':
+      const { FileDepositRepository } = require('./fileDepositRepository');
+      repository = new FileDepositRepository(repoOptions);
+      break;
+
     case 'memory':
       const { MemoryDepositRepository } = require('./memoryDepositRepository');
       repository = new MemoryDepositRepository(repoOptions);
