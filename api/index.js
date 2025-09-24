@@ -358,7 +358,23 @@ export default async function handler(req, res) {
 
     // Admin login (public - no auth required)
     if (pathname === '/api/admin/login' && method === 'POST') {
-      const { email, password } = req.body || {};
+      console.log('Admin login attempt:', { pathname, method, headers: req.headers });
+
+      let body;
+      try {
+        // Parse JSON body manually for admin login
+        if (typeof req.body === 'string') {
+          body = JSON.parse(req.body);
+        } else {
+          body = req.body || {};
+        }
+        console.log('Parsed body:', body);
+      } catch (error) {
+        console.error('JSON parse error:', error);
+        return res.status(400).json({ error: 'Invalid JSON in request body' });
+      }
+
+      const { email, password } = body;
 
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
