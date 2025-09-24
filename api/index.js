@@ -465,6 +465,66 @@ export default async function handler(req, res) {
         });
       }
 
+      // Admin deposit creation endpoint
+      if (pathname === '/api/admin/deposits' && method === 'POST') {
+        const { amount, customerId, metadata } = req.body || {};
+
+        if (!amount || !customerId) {
+          return res.status(400).json({
+            error: 'Amount and customerId are required'
+          });
+        }
+
+        try {
+          // Create deposit using the same logic as demo API
+          const depositId = `dep_admin_${Date.now()}`;
+          const deposit = {
+            id: depositId,
+            customerId,
+            amount: Math.round(amount * 100), // Convert to cents
+            currency: 'usd',
+            status: 'pending',
+            paymentIntentId: `pi_admin_${Date.now()}`,
+            createdAt: new Date().toISOString(),
+            metadata: {
+              admin: true,
+              ...metadata
+            }
+          };
+
+          // Save to repository
+          await repository.save(deposit);
+
+          // Also save to shared storage
+          global.CROSS_API_DEPOSITS.set(deposit.id, deposit);
+
+          logAdminAction(adminAuth.user, 'CREATE_DEPOSIT', {
+            depositId: deposit.id,
+            amount: deposit.amount,
+            customerId,
+            ip: clientIP
+          });
+
+          return res.status(200).json({
+            success: true,
+            deposit: {
+              id: deposit.id,
+              customerId: deposit.customerId,
+              amount: deposit.amount,
+              currency: deposit.currency,
+              status: deposit.status,
+              createdAt: deposit.createdAt
+            }
+          });
+        } catch (error) {
+          console.error('Failed to create deposit:', error);
+          return res.status(500).json({
+            error: 'Failed to create deposit',
+            details: error.message
+          });
+        }
+      }
+
       // Admin deposit actions
       const adminDepositMatch = pathname.match(/^\/api\/admin\/deposits\/([^\/]+)\/(.+)$/);
       if (adminDepositMatch && method === 'POST') {

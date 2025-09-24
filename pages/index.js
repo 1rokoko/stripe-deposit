@@ -69,15 +69,36 @@ export default function Home() {
       const validAmounts = [100, 200];
       const holdAmount = validAmounts.includes(amount) ? amount : 100;
 
-      const response = await fetch(`/api/demo/deposits/hold/${holdAmount}`, {
+      // Get admin token first
+      const loginResponse = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'admin@stripe-deposit.com',
+          password: 'admin123'
+        })
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error('Failed to authenticate');
+      }
+
+      const loginData = await loginResponse.json();
+      const token = loginData.token;
+
+      // Create deposit using admin API
+      const response = await fetch('/api/admin/deposits', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
+          amount: holdAmount,
           customerId: formData.customerId,
           metadata: {
-            cardNumber: formData.cardNumber.slice(-4), // Only store last 4 digits
+            demo: true,
+            cardNumber: formData.cardNumber.slice(-4),
             requestedAmount: formData.amount,
           },
         }),
@@ -109,10 +130,28 @@ export default function Home() {
 
   const handleDepositAction = async (depositId, action) => {
     try {
-      const response = await fetch(`/api/demo/deposits/${depositId}/${action}`, {
+      // Get admin token first
+      const loginResponse = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'admin@stripe-deposit.com',
+          password: 'admin123'
+        })
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error('Failed to authenticate');
+      }
+
+      const loginData = await loginResponse.json();
+      const token = loginData.token;
+
+      const response = await fetch(`/api/admin/deposits/${depositId}/${action}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
       });
 
