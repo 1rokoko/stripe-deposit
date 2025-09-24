@@ -19,13 +19,43 @@ export default function Home() {
 
   const fetchDemoDeposits = async () => {
     try {
-      const response = await fetch('/api/demo/deposits');
-      if (response.ok) {
-        const data = await response.json();
-        setDeposits(data.deposits || []);
+      // Try to fetch from demo API first
+      const demoResponse = await fetch('/api/demo/deposits');
+      if (demoResponse.ok) {
+        const demoData = await demoResponse.json();
+        setDeposits(demoData.deposits || []);
+        return;
+      }
+
+      // Fallback to admin API if demo API fails
+      try {
+        const loginResponse = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: 'admin@stripe-deposit.com',
+            password: 'admin123'
+          })
+        });
+
+        if (loginResponse.ok) {
+          const loginData = await loginResponse.json();
+          const token = loginData.token;
+
+          const response = await fetch('/api/admin/deposits', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setDeposits(data.deposits || []);
+          }
+        }
+      } catch (adminError) {
+        console.error('Error fetching from admin API:', adminError);
       }
     } catch (error) {
-      console.error('Error fetching demo deposits:', error);
+      console.error('Error fetching deposits:', error);
     }
   };
 

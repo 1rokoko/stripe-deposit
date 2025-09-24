@@ -1,6 +1,9 @@
 // Demo endpoint with shared repository
 const { createDepositRepository } = require('../src/repositories/repositoryFactory');
 
+// Shared storage for cross-API persistence
+global.CROSS_API_DEPOSITS = global.CROSS_API_DEPOSITS || new Map();
+
 // Repository factory function for serverless environment
 function createRepositoryForRequest() {
   try {
@@ -146,6 +149,10 @@ export default async function handler(req, res) {
 
       // Save to repository
       await repository.save(deposit);
+
+      // Also save to shared global storage for cross-API access
+      global.CROSS_API_DEPOSITS.set(deposit.id, deposit);
+      console.log('💾 Saved deposit to shared storage:', deposit.id);
 
       return res.status(200).json({
         success: true,

@@ -1,5 +1,8 @@
 // Vercel serverless function adapter for stripe-deposit
 const { loadEnv } = require('../src/config');
+
+// Shared storage for cross-API persistence
+global.CROSS_API_DEPOSITS = global.CROSS_API_DEPOSITS || new Map();
 const { StripeClient } = require('../src/stripe/stripeClient');
 const { verifyStripeSignature } = require('../src/stripe/webhookVerifier');
 const { StripeWebhookHandler } = require('../src/stripe/webhookHandler');
@@ -421,13 +424,41 @@ export default async function handler(req, res) {
           limit: limit ? parseInt(limit) : 100
         });
 
+        // Also include deposits from shared storage (from demo API)
+        const sharedDeposits = Array.from(global.CROSS_API_DEPOSITS.values());
+        const allDeposits = [...result.deposits, ...sharedDeposits];
+
+        // Apply filters to combined deposits
+        let filteredDeposits = allDeposits;
+        if (status) {
+          filteredDeposits = filteredDeposits.filter(d => d.status === status);
+        }
+        if (customerId) {
+          filteredDeposits = filteredDeposits.filter(d => d.customerId === customerId);
+        }
+
+        // Apply limit
+        const limitValue = limit ? parseInt(limit) : 100;
+        const finalDeposits = filteredDeposits.slice(0, limitValue);
+
         logAdminAction(adminAuth.user, 'VIEW_DEPOSITS', {
           filters: { status, customerId, limit },
-          ip: clientIP
+          ip: clientIP,
+          sharedCount: sharedDeposits.length,
+          totalCount: allDeposits.length
         });
 
-        // Return the result directly - it already has the correct structure { deposits: [...], total: ... }
-        return res.status(200).json(result);
+        console.log('📊 Admin API returning deposits:', {
+          repository: result.deposits.length,
+          shared: sharedDeposits.length,
+          total: finalDeposits.length
+        });
+
+        // Return combined result
+        return res.status(200).json({
+          deposits: finalDeposits,
+          total: filteredDeposits.length
+        });
       }
 
       // Admin deposit actions
