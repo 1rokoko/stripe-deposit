@@ -127,7 +127,7 @@ export default async function handler(req, res) {
         paymentMethodId: `pm_demo_${Date.now()}`,
         currency: 'usd',
         holdAmount: amount * 100, // Convert to cents
-        status: 'authorized',
+        status: 'pending', // Changed to pending so capture/release buttons appear
         verificationPaymentIntentId: `pi_verify_demo_${Date.now()}`,
         activePaymentIntentId: `pi_demo_${Date.now()}`,
         createdAt: now.toISOString(),
@@ -183,45 +183,104 @@ export default async function handler(req, res) {
       });
     }
 
-    // Demo deposit actions
+    // Demo deposit actions - now with real repository updates
     const actionMatch = pathname.match(/^\/demo\/deposits\/([^\/]+)\/(.+)$/);
     if (actionMatch && method === 'POST') {
       const depositId = actionMatch[1];
       const action = actionMatch[2];
+      const repository = createRepositoryForRequest();
 
-      const demoResponse = {
-        depositId,
-        action,
-        success: true,
-        timestamp: new Date().toISOString(),
-        note: 'This is a demo. No real action was performed.'
-      };
-
-      switch (action) {
-        case 'capture':
-          return res.status(200).json({
-            ...demoResponse,
-            message: 'Demo deposit captured successfully',
-            capturedAmount: req.body?.amount || 10000
-          });
-
-        case 'release':
-          return res.status(200).json({
-            ...demoResponse,
-            message: 'Demo deposit released successfully'
-          });
-
-        case 'reauthorize':
-          return res.status(200).json({
-            ...demoResponse,
-            message: 'Demo deposit reauthorized successfully'
-          });
-
-        default:
+      try {
+        // Find the deposit in repository
+        const deposit = await repository.findById(depositId);
+        if (!deposit) {
           return res.status(404).json({
-            error: 'Action not found',
-            availableActions: ['capture', 'release', 'reauthorize']
+            error: 'Deposit not found',
+            depositId
           });
+        }
+
+        const now = new Date();
+        let updatedDeposit;
+
+        switch (action) {
+          case 'capture':
+            if (deposit.status !== 'pending') {
+              return res.status(400).json({
+                error: 'Deposit must be in pending status to capture',
+                currentStatus: deposit.status
+              });
+            }
+
+            updatedDeposit = await repository.update(depositId, (current) => ({
+              ...current,
+              status: 'captured',
+              capturedAmount: req.body?.amount || current.holdAmount,
+              capturedAt: now.toISOString()
+            }));
+
+            return res.status(200).json({
+              success: true,
+              action: 'capture',
+              depositId,
+              message: 'Demo deposit captured successfully',
+              capturedAmount: updatedDeposit.capturedAmount,
+              timestamp: now.toISOString(),
+              note: 'This is a demo. No real payment was processed.'
+            });
+
+          case 'release':
+            if (deposit.status !== 'pending') {
+              return res.status(400).json({
+                error: 'Deposit must be in pending status to release',
+                currentStatus: deposit.status
+              });
+            }
+
+            updatedDeposit = await repository.update(depositId, (current) => ({
+              ...current,
+              status: 'released',
+              releasedAt: now.toISOString()
+            }));
+
+            return res.status(200).json({
+              success: true,
+              action: 'release',
+              depositId,
+              message: 'Demo deposit released successfully',
+              timestamp: now.toISOString(),
+              note: 'This is a demo. No real payment was processed.'
+            });
+
+          case 'reauthorize':
+            updatedDeposit = await repository.update(depositId, (current) => ({
+              ...current,
+              lastAuthorizationAt: now.toISOString()
+            }));
+
+            return res.status(200).json({
+              success: true,
+              action: 'reauthorize',
+              depositId,
+              message: 'Demo deposit reauthorized successfully',
+              timestamp: now.toISOString(),
+              note: 'This is a demo. No real payment was processed.'
+            });
+
+          default:
+            return res.status(404).json({
+              error: 'Action not found',
+              availableActions: ['capture', 'release', 'reauthorize']
+            });
+        }
+      } catch (error) {
+        console.error('Demo API action error:', error);
+        return res.status(500).json({
+          error: 'Internal server error',
+          message: error.message,
+          action,
+          depositId
+        });
       }
     }
 
