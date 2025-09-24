@@ -425,7 +425,7 @@ export default async function handler(req, res) {
       // Admin deposits endpoint
       if (pathname === '/api/admin/deposits' && method === 'GET') {
         const { status, customerId, limit } = req.query || {};
-        const deposits = await repository.findAll({
+        const result = await repository.findAll({
           status,
           customerId,
           limit: limit ? parseInt(limit) : 100
@@ -436,7 +436,8 @@ export default async function handler(req, res) {
           ip: clientIP
         });
 
-        return res.status(200).json(deposits);
+        // Return the result directly - it already has the correct structure { deposits: [...], total: ... }
+        return res.status(200).json(result);
       }
 
       // Admin deposit actions
