@@ -55,7 +55,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         const data = await response.json();
         setDeposits(data.deposits || []);
-        console.log('Fetched deposits from demo API:', data.deposits?.length || 0);
+        console.log('🎯 FINAL FIX: Fetched deposits from demo API:', data.deposits?.length || 0);
       } else {
         throw new Error('Failed to fetch deposits from demo API');
       }
