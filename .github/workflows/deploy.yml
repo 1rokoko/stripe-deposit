@@ -35,4 +35,216 @@ jobs:
       - name: Run tests
         run: npm run test:ci
 
+      - name: Create deployment archive
+        run: |
+          set -euo pipefail
+          git clean -fdx
+          git reset --hard
+          git archive --format=tar HEAD | gzip > release.tar.gz
 
+      - name: Prepare SSH key (if provided)
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
+        id: prepare_ssh
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          KEY_CONTENT="${{ env.SSH_KEY }}"
+          if echo "$KEY_CONTENT" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+            echo "$KEY_CONTENT" | tr -d '\r' > ~/.ssh/deploy_key
+          else
+            echo "$KEY_CONTENT" | tr -d '\r\n' | base64 -d > ~/.ssh/deploy_key || {
+              echo "SSH_KEY secret does not look like an OpenSSH private key or base64-encoded key." >&2
+              exit 1
+            }
+          fi
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Add known_hosts
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          if [ -n "${{ env.SSH_HOST }}" ]; then
+            ssh-keyscan -T 5 -H "${{ env.SSH_HOST }}" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Upload archive to server (key)
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key_path: ~/.ssh/deploy_key
+          source: release.tar.gz
+          target: /tmp/
+
+      - name: Upload archive to server (password)
+        if: ${{ env.SSH_PASSWORD != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          source: release.tar.gz
+          target: /tmp/
+
+      - name: Deploy on server (key)
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key_path: ~/.ssh/deploy_key
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"
+            if [ -z "$DEPLOY_DIR" ]; then
+              DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"
+            fi
+            if [ -z "$DEPLOY_DIR" ]; then
+              DEPLOY_DIR="/root/deposit-stripe"
+            fi
+            mkdir -p "$DEPLOY_DIR"
+            tar -xzf /tmp/release.tar.gz -C "$DEPLOY_DIR" --strip-components=1
+            rm -f /tmp/release.tar.gz
+            cd "$DEPLOY_DIR"
+            if command -v docker >/dev/null 2>&1; then
+              if docker compose version >/dev/null 2>&1; then
+                docker compose up -d --build
+              else
+                docker-compose up -d --build
+              fi
+            else
+              if ! command -v node >/dev/null 2>&1; then
+                echo "Node.js is required on the target host" >&2
+                exit 1
+              fi
+              if [ -f package-lock.json ]; then
+                npm ci --omit=dev
+              else
+                npm install --production
+              fi
+              if command -v pm2 >/dev/null 2>&1; then
+                pm2 start npm --name stripe-deposit -- start || pm2 restart stripe-deposit
+              else
+                nohup npm start >/var/log/stripe-deposit.log 2>&1 &
+              fi
+            fi
+
+      - name: Deploy on server (password)
+        if: ${{ env.SSH_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"
+            if [ -z "$DEPLOY_DIR" ]; then
+              DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"
+            fi
+            if [ -z "$DEPLOY_DIR" ]; then
+              DEPLOY_DIR="/root/deposit-stripe"
+            fi
+            mkdir -p "$DEPLOY_DIR"
+            tar -xzf /tmp/release.tar.gz -C "$DEPLOY_DIR" --strip-components=1
+            rm -f /tmp/release.tar.gz
+            cd "$DEPLOY_DIR"
+            if command -v docker >/dev/null 2>&1; then
+              if docker compose version >/dev/null 2>&1; then
+                docker compose up -d --build
+              else
+                docker-compose up -d --build
+              fi
+            else
+              if ! command -v node >/dev/null 2>&1; then
+                echo "Node.js is required on the target host" >&2
+                exit 1
+              fi
+              if [ -f package-lock.json ]; then
+                npm ci --omit=dev
+              else
+                npm install --production
+              fi
+              if command -v pm2 >/dev/null 2>&1; then
+                pm2 start npm --name stripe-deposit -- start || pm2 restart stripe-deposit
+              else
+                nohup npm start >/var/log/stripe-deposit.log 2>&1 &
+              fi
+            fi
+
+      - name: Verify on server (password)
+        if: ${{ env.SSH_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
+            echo "CHECK#1: process/container status"
+            if command -v docker >/dev/null 2>&1; then docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps || docker compose ps || docker ps; else pgrep -fa node || true; fi
+            echo "CHECK#2: health endpoint"
+            if command -v curl >/dev/null 2>&1; then curl -sf http://localhost:3000/healthz | sed -e 's/.*/OK/'; else wget -qO- http://localhost:3000/healthz >/dev/null && echo OK || (echo "health check failed" >&2; exit 1); fi
+            echo "CHECK#3: metrics head"
+            if command -v curl >/dev/null 2>&1; then curl -s http://localhost:3000/metrics | head -n 5 || true; else wget -qO- http://localhost:3000/metrics | head -n 5 || true; fi
+
+      - name: Verify on server (key)
+        if: ${{ env.SSH_PASSWORD == '' && env.SSH_KEY != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key_path: ~/.ssh/deploy_key
+          script: |
+            set -euo pipefail
+            DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_SECRET }}"; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="${{ env.REMOTE_DEPLOY_DIR_VAR }}"; fi; if [ -z "$DEPLOY_DIR" ]; then DEPLOY_DIR="/root/deposit-stripe"; fi
+            echo "CHECK#1: process/container status"
+            if command -v docker >/dev/null 2>&1; then docker compose -f "$DEPLOY_DIR/docker-compose.yml" ps || docker compose ps || docker ps; else pgrep -fa node || true; fi
+            echo "CHECK#2: health endpoint"
+            if command -v curl >/dev/null 2>&1; then curl -sf http://localhost:3000/healthz | sed -e 's/.*/OK/'; else wget -qO- http://localhost:3000/healthz >/dev/null && echo OK || (echo "health check failed" >&2; exit 1); fi
+            echo "CHECK#3: metrics head"
+            if command -v curl >/dev/null 2>&1; then curl -s http://localhost:3000/metrics | head -n 5 || true; else wget -qO- http://localhost:3000/metrics | head -n 5 || true; fi
+
+      - name: Generate deploy key on server (password)
+        if: ${{ env.SSH_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          script: |
+            set -euo pipefail
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            if [ ! -f ~/.ssh/gha_deploy_key ]; then
+              ssh-keygen -t ed25519 -N "" -f ~/.ssh/gha_deploy_key
+              cat ~/.ssh/gha_deploy_key.pub >> ~/.ssh/authorized_keys
+              chmod 600 ~/.ssh/authorized_keys
+            fi
+            echo "Deploy key prepared at ~/.ssh/gha_deploy_key (.pub installed to authorized_keys)."
+
+
+      - name: Output deploy key (base64) [one-off]
+        if: ${{ env.SSH_PASSWORD != '' }}
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          script: |
+            set -e
+            if [ -f ~/.ssh/gha_deploy_key ]; then
+              if command -v base64 >/dev/null 2>&1; then
+                echo "DEPLOY_KEY_B64_START"
+                base64 -w0 ~/.ssh/gha_deploy_key 2>/dev/null || base64 ~/.ssh/gha_deploy_key
+                echo
+                echo "DEPLOY_KEY_B64_END"
+              else
+                echo "base64 not found" >&2
+                exit 1
+              fi
+            else
+              echo "deploy key not found" >&2
+              exit 1
+            fi

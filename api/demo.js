@@ -62,12 +62,20 @@ export default async function handler(req, res) {
     }
 
     if (pathname === '/demo/health') {
+      // Test repository creation for diagnostics
+      const repository = createRepositoryForRequest();
+      const repositoryType = repository.constructor.name;
+
       return res.status(200).json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         service: 'stripe-deposit-demo',
         version: '1.0.0',
-        environment: 'vercel-serverless'
+        environment: 'vercel-serverless',
+        repository: {
+          type: repositoryType,
+          databaseUrl: process.env.DATABASE_URL ? 'present' : 'missing'
+        }
       });
     }
 
