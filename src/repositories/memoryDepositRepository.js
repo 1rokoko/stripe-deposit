@@ -12,6 +12,18 @@ class MemoryDepositRepository {
     return cloned;
   }
 
+  async update(id, updateFn) {
+    const existing = this.deposits.get(id);
+    if (!existing) {
+      throw new Error(`Deposit with id ${id} not found`);
+    }
+
+    const updated = updateFn(existing);
+    const cloned = JSON.parse(JSON.stringify(updated));
+    this.deposits.set(id, cloned);
+    return cloned;
+  }
+
   async findById(id) {
     const deposit = this.deposits.get(id);
     return deposit ? JSON.parse(JSON.stringify(deposit)) : null;

@@ -44,14 +44,18 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchDeposits = async () => {
+  const fetchDeposits = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError('');
 
       // FORCE DEPLOY: Fetch from demo API without authentication - Updated at 2025-09-24
-      console.log('🔄 FORCE DEPLOY: Fetching deposits from demo API...');
-      const response = await fetch('/api/demo/deposits');
+      const timestamp = new Date().toISOString();
+      console.log('🔄 FORCE DEPLOY: Fetching deposits from demo API...', forceRefresh ? '(FORCE REFRESH)' : '', timestamp);
+
+      // Add cache busting parameter for force refresh
+      const url = forceRefresh ? `/api/demo/deposits?_t=${Date.now()}` : '/api/demo/deposits';
+      const response = await fetch(url);
 
       if (response.ok) {
         const data = await response.json();
@@ -338,11 +342,11 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">Recent Deposits</h2>
                 <button
-                  onClick={fetchDeposits}
+                  onClick={() => fetchDeposits(true)}
                   disabled={loading}
                   className={`text-sm ${loading ? 'text-gray-400' : 'text-blue-600 hover:text-blue-800'}`}
                 >
-                  {loading ? '⏳ Loading...' : '🔄 Refresh'}
+                  {loading ? '⏳ Loading...' : '🔄 Force Refresh'}
                 </button>
               </div>
             </div>
