@@ -18,11 +18,6 @@ const nextConfig = {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
   
-  // Optimize for Vercel deployment
-  experimental: {
-    optimizeCss: true,
-  },
-  
   // Handle static files
   trailingSlash: false,
   
