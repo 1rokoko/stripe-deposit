@@ -8,6 +8,9 @@ const { NotificationService } = require('../src/services/notificationService');
 const { buildLogger } = require('../src/utils/logger');
 const { createDepositRepository } = require('../src/repositories/repositoryFactory');
 
+// Global singleton repository for serverless environment
+let globalRepository = null;
+
 // Repository will be created using factory pattern
 
 class MemoryNotificationService {
@@ -183,10 +186,21 @@ function initializeServices() {
     throw new Error('API_AUTH_TOKEN environment variable is required');
   }
   
-  // Use repository factory to get the best available repository (SQLite > Memory)
-  const repository = createDepositRepository({
-    filePath: '/tmp/deposits.db' // Use /tmp for Vercel serverless functions
-  });
+  // Use global singleton repository for data persistence across requests
+  if (!globalRepository) {
+    try {
+      globalRepository = createDepositRepository({
+        type: 'memory' // Use memory for serverless compatibility
+      });
+      console.log('Created new global repository instance');
+    } catch (error) {
+      console.error('Failed to create repository:', error);
+      // Fallback to inline memory repository
+      const { MemoryDepositRepository } = require('../src/repositories/memoryDepositRepository');
+      globalRepository = new MemoryDepositRepository();
+    }
+  }
+  const repository = globalRepository;
   const notificationService = new MemoryNotificationService({
     logger: buildLogger('notification-service'),
     externalWebhookUrl: env.ALERT_WEBHOOK_URL,
