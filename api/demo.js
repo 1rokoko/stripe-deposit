@@ -4,19 +4,12 @@ const { createDepositRepository } = require('../src/repositories/repositoryFacto
 // Repository factory function for serverless environment
 function createRepositoryForRequest() {
   try {
-    console.log('Demo API: Creating repository with DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
-
-    // For Vercel, use SQLite with persistent file in /tmp
-    if (!process.env.DATABASE_URL) {
-      const path = require('path');
-      const { SqliteDepositRepository } = require('../src/repositories/sqliteDepositRepository');
-      const dbPath = path.join('/tmp', 'stripe-deposit.db');
-      console.log('Demo API: Using SQLite at:', dbPath);
-      return new SqliteDepositRepository({ filePath: dbPath });
-    }
+    console.log('Demo API: Creating repository...');
+    console.log('Demo API: Environment - VERCEL:', !!process.env.VERCEL, 'NODE_ENV:', process.env.NODE_ENV);
+    console.log('Demo API: DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
 
     const repository = createDepositRepository({
-      type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory
+      type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory (with global singleton)
     });
     console.log('Demo API: ✅ Created repository instance:', repository.constructor.name);
     return repository;
