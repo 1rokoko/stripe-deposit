@@ -356,71 +356,56 @@ export default async function handler(req, res) {
       });
     }
 
-    // Admin login (public - no auth required)
-    if (pathname === '/api/admin/login' && method === 'POST') {
-      console.log('Admin login attempt:', { pathname, method, headers: req.headers });
+    // All Admin API endpoints (no main API auth required)
+    if (pathname.startsWith('/api/admin')) {
+      // Admin login (public - no auth required)
+      if (pathname === '/api/admin/login' && method === 'POST') {
+        console.log('Admin login attempt:', { pathname, method, headers: req.headers });
 
-      let body;
-      try {
-        // Parse JSON body manually for admin login
-        if (typeof req.body === 'string') {
-          body = JSON.parse(req.body);
-        } else {
-          body = req.body || {};
+        let body;
+        try {
+          // Parse JSON body manually for admin login
+          if (typeof req.body === 'string') {
+            body = JSON.parse(req.body);
+          } else {
+            body = req.body || {};
+          }
+          console.log('Parsed body:', body);
+        } catch (error) {
+          console.error('JSON parse error:', error);
+          return res.status(400).json({ error: 'Invalid JSON in request body' });
         }
-        console.log('Parsed body:', body);
-      } catch (error) {
-        console.error('JSON parse error:', error);
-        return res.status(400).json({ error: 'Invalid JSON in request body' });
-      }
 
-      const { email, password } = body;
+        const { email, password } = body;
 
-      if (!email || !password) {
-        return res.status(400).json({ error: 'Email and password are required' });
-      }
-
-      const adminUser = verifyAdminCredentials(email, password);
-      if (!adminUser) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const token = generateAdminToken(adminUser);
-
-      // Log admin login
-      logAdminAction(adminUser, 'LOGIN', {
-        ip: clientIP,
-        userAgent: req.headers['user-agent']
-      });
-
-      return res.status(200).json({
-        token,
-        admin: {
-          id: adminUser.id,
-          email: adminUser.email,
-          role: adminUser.role
+        if (!email || !password) {
+          return res.status(400).json({ error: 'Email and password are required' });
         }
-      });
-    }
 
-    // All other routes require authentication
-    // Create auth middleware instance
-    const authMiddleware = createAuthMiddleware({
-      apiToken: env.API_AUTH_TOKEN,
-      enableLogging: true
-    });
+        const adminUser = verifyAdminCredentials(email, password);
+        if (!adminUser) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-    // Check authorization with enhanced middleware
-    if (!authMiddleware.requireAuth(req, res)) {
-      return; // Response already sent by middleware
-    }
+        const token = generateAdminToken(adminUser);
 
-    // Initialize services only after auth check
-    const { logger, repository, depositService, webhookHandler, jobHealthStore, webhookRetryQueue, notificationService } = initializeServices();
+        // Log admin login
+        logAdminAction(adminUser, 'LOGIN', {
+          ip: clientIP,
+          userAgent: req.headers['user-agent']
+        });
 
-    // Admin API endpoints (except login which is handled above)
-    if (pathname.startsWith('/api/admin') && pathname !== '/api/admin/login') {
-      // All admin endpoints require admin authentication
+        return res.status(200).json({
+          token,
+          admin: {
+            id: adminUser.id,
+            email: adminUser.email,
+            role: adminUser.role
+          }
+        });
+      }
+
+      // All other admin endpoints require admin authentication
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Admin authentication required' });
@@ -433,6 +418,9 @@ export default async function handler(req, res) {
       } catch (error) {
         return res.status(401).json({ error: 'Invalid admin token' });
       }
+
+      // Initialize services for admin endpoints
+      const { logger, repository, depositService, webhookHandler, jobHealthStore, webhookRetryQueue, notificationService } = initializeServices();
 
       // Admin deposits endpoint
       if (pathname === '/api/admin/deposits' && method === 'GET') {
@@ -498,6 +486,21 @@ export default async function handler(req, res) {
 
       return res.status(404).json({ error: 'Admin endpoint not found' });
     }
+
+    // All other routes require authentication
+    // Create auth middleware instance
+    const authMiddleware = createAuthMiddleware({
+      apiToken: env.API_AUTH_TOKEN,
+      enableLogging: true
+    });
+
+    // Check authorization with enhanced middleware
+    if (!authMiddleware.requireAuth(req, res)) {
+      return; // Response already sent by middleware
+    }
+
+    // Initialize services only after auth check
+    const { logger, repository, depositService, webhookHandler, jobHealthStore, webhookRetryQueue, notificationService } = initializeServices();
 
     // Metrics endpoint
     if (pathname === '/metrics') {
