@@ -12,7 +12,8 @@ function createRepositoryForRequest() {
     console.log('Demo API: DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
 
     const repository = createDepositRepository({
-      type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory (with global singleton)
+      type: 'sqlite', // Force SQLite for reliable persistence
+      filePath: '/tmp/stripe-deposit.db' // Use /tmp for Vercel serverless
     });
     console.log('Demo API: ✅ Created repository instance:', repository.constructor.name);
     return repository;

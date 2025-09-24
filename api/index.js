@@ -14,15 +14,19 @@ const { createDepositRepository } = require('../src/repositories/repositoryFacto
 // Repository factory function for serverless environment
 function createRepositoryForRequest() {
   try {
-    console.log('Creating repository with DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
+    console.log('Admin API: Creating repository...');
+    console.log('Admin API: Environment - VERCEL:', !!process.env.VERCEL, 'NODE_ENV:', process.env.NODE_ENV);
+    console.log('Admin API: DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
+
     const repository = createDepositRepository({
-      type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory
+      type: 'sqlite', // Force SQLite for reliable persistence
+      filePath: '/tmp/stripe-deposit.db' // Use same file as demo API
     });
-    console.log('✅ Created repository instance:', repository.constructor.name);
+    console.log('Admin API: ✅ Created repository instance:', repository.constructor.name);
     return repository;
   } catch (error) {
-    console.error('❌ Failed to create repository:', error.message);
-    console.error('Falling back to MemoryDepositRepository');
+    console.error('Admin API: ❌ Failed to create repository:', error.message);
+    console.error('Admin API: Falling back to MemoryDepositRepository');
     // Fallback to inline memory repository
     const { MemoryDepositRepository } = require('../src/repositories/memoryDepositRepository');
     return new MemoryDepositRepository();
