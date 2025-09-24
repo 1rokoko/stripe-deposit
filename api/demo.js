@@ -152,7 +152,7 @@ export default async function handler(req, res) {
       };
 
       // Save to repository
-      await repository.create(deposit);
+      await repository.save(deposit);
 
       return res.status(200).json({
         success: true,
