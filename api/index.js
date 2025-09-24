@@ -305,6 +305,14 @@ function initializeServices() {
 // Import enhanced auth middleware
 const { createAuthMiddleware } = require('../src/auth/authMiddleware');
 
+// Import admin authentication
+const {
+  verifyAdminCredentials,
+  generateAdminToken,
+  verifyAdminToken,
+  logAdminAction
+} = require('../lib/admin-auth');
+
 // Utility functions (keeping for backward compatibility)
 function isAuthorized(req, apiToken) {
   const authHeader = req.headers.authorization;
@@ -363,11 +371,123 @@ export default async function handler(req, res) {
     // Initialize services only after auth check
     const { logger, repository, depositService, webhookHandler, jobHealthStore, webhookRetryQueue, notificationService } = initializeServices();
 
+    // Admin API endpoints
+    if (pathname.startsWith('/api/admin')) {
+      // Admin login (no auth required)
+      if (pathname === '/api/admin/login' && method === 'POST') {
+        const { email, password } = req.body || {};
+
+        if (!email || !password) {
+          return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        const adminUser = verifyAdminCredentials(email, password);
+        if (!adminUser) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = generateAdminToken(adminUser);
+
+        // Log admin login
+        logAdminAction(adminUser, 'LOGIN', {
+          ip: clientIP,
+          userAgent: req.headers['user-agent']
+        });
+
+        return res.status(200).json({
+          token,
+          admin: {
+            id: adminUser.id,
+            email: adminUser.email,
+            role: adminUser.role
+          }
+        });
+      }
+
+      // All other admin endpoints require admin authentication
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Admin authentication required' });
+      }
+
+      let adminAuth;
+      try {
+        const token = authHeader.substring(7);
+        adminAuth = verifyAdminToken(token);
+      } catch (error) {
+        return res.status(401).json({ error: 'Invalid admin token' });
+      }
+
+      // Admin deposits endpoint
+      if (pathname === '/api/admin/deposits' && method === 'GET') {
+        const { status, customerId, limit } = req.query || {};
+        const deposits = await repository.findAll({
+          status,
+          customerId,
+          limit: limit ? parseInt(limit) : 100
+        });
+
+        logAdminAction(adminAuth.user, 'VIEW_DEPOSITS', {
+          filters: { status, customerId, limit },
+          ip: clientIP
+        });
+
+        return res.status(200).json(deposits);
+      }
+
+      // Admin deposit actions
+      const adminDepositMatch = pathname.match(/^\/api\/admin\/deposits\/([^\/]+)\/(.+)$/);
+      if (adminDepositMatch && method === 'POST') {
+        const depositId = adminDepositMatch[1];
+        const action = adminDepositMatch[2];
+
+        const body = req.body || {};
+        let result;
+
+        try {
+          switch (action) {
+            case 'capture':
+              result = await depositService.captureDeposit({
+                depositId,
+                amount: body.amount,
+                metadata: body.metadata
+              });
+              break;
+
+            case 'release':
+              result = await depositService.releaseDeposit({ depositId });
+              break;
+
+            case 'reauthorize':
+              result = await depositService.reauthorizeDeposit({
+                depositId,
+                metadata: body.metadata
+              });
+              break;
+
+            default:
+              return res.status(404).json({ error: 'Invalid action' });
+          }
+
+          logAdminAction(adminAuth.user, `DEPOSIT_${action.toUpperCase()}`, {
+            depositId,
+            ip: clientIP
+          });
+
+          return res.status(200).json(result);
+        } catch (error) {
+          return res.status(400).json({ error: error.message });
+        }
+      }
+
+      return res.status(404).json({ error: 'Admin endpoint not found' });
+    }
+
     // Metrics endpoint
     if (pathname === '/metrics') {
       const jobHealth = await jobHealthStore.getAllJobHealth();
       const webhookStats = await webhookRetryQueue.getStats();
-      
+
       return res.status(200).json({
         timestamp: new Date().toISOString(),
         jobs: jobHealth,
