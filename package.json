@@ -9,10 +9,7 @@
     "deposits:cli": "node scripts/deposits-cli.js",
     "notifications:cli": "node scripts/notifications-cli.js",
     "test": "node --test",
-    "test:e2e:stripe": "node scripts/stripe-cli-e2e.js",
-    "dev": "next dev",
-    "build": "next build",
-    "next-start": "next start"
+    "test:e2e:stripe": "node scripts/stripe-cli-e2e.js"
   },
   "keywords": [
     "stripe",
@@ -21,18 +18,9 @@
   ],
   "author": "",
   "license": "ISC",
+  "type": "commonjs",
   "dependencies": {
     "better-sqlite3": "^9.4.0",
-    "next": "^14.2.33",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "jsonwebtoken": "^9.0.2",
-    "stripe": "^14.21.0",
-    "bcryptjs": "^2.4.3"
-  },
-  "devDependencies": {
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8.4.35",
-    "autoprefixer": "^10.4.17"
+    "pg": "^8.11.3"
   }
 }

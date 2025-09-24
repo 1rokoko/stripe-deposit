@@ -190,7 +190,7 @@ function initializeServices() {
   if (!globalRepository) {
     try {
       globalRepository = createDepositRepository({
-        type: 'memory' // Use memory for serverless compatibility
+        type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory
       });
       console.log('Created new global repository instance');
     } catch (error) {
