@@ -5,6 +5,16 @@ const { createDepositRepository } = require('../src/repositories/repositoryFacto
 function createRepositoryForRequest() {
   try {
     console.log('Demo API: Creating repository with DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
+
+    // For Vercel, use SQLite with persistent file in /tmp
+    if (!process.env.DATABASE_URL) {
+      const path = require('path');
+      const { SqliteDepositRepository } = require('../src/repositories/sqliteDepositRepository');
+      const dbPath = path.join('/tmp', 'stripe-deposit.db');
+      console.log('Demo API: Using SQLite at:', dbPath);
+      return new SqliteDepositRepository({ filePath: dbPath });
+    }
+
     const repository = createDepositRepository({
       type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory
     });
