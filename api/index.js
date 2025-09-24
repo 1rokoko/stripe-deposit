@@ -422,47 +422,81 @@ export default async function handler(req, res) {
       // Admin deposits endpoint
       if (pathname === '/api/admin/deposits' && method === 'GET') {
         const { status, customerId, limit } = req.query || {};
-        const result = await repository.findAll({
-          status,
-          customerId,
-          limit: limit ? parseInt(limit) : 100
-        });
 
-        // Also include deposits from shared storage (from demo API)
-        const sharedDeposits = Array.from(global.CROSS_API_DEPOSITS.values());
-        const allDeposits = [...result.deposits, ...sharedDeposits];
+        try {
+          // Get deposits from admin repository
+          const result = await repository.findAll({
+            status,
+            customerId,
+            limit: limit ? parseInt(limit) : 100
+          });
 
-        // Apply filters to combined deposits
-        let filteredDeposits = allDeposits;
-        if (status) {
-          filteredDeposits = filteredDeposits.filter(d => d.status === status);
+          // CRITICAL FIX: Also fetch deposits from demo API to ensure cross-API visibility
+          let demoDeposits = [];
+          try {
+            const demoResponse = await fetch('https://stripe-deposit.vercel.app/api/demo/deposits');
+            if (demoResponse.ok) {
+              const demoData = await demoResponse.json();
+              demoDeposits = demoData.deposits || [];
+              console.log('🔄 Fetched deposits from demo API:', demoDeposits.length);
+            }
+          } catch (demoError) {
+            console.warn('⚠️ Failed to fetch from demo API:', demoError.message);
+          }
+
+          // Also include deposits from shared storage (from demo API)
+          const sharedDeposits = Array.from(global.CROSS_API_DEPOSITS.values());
+
+          // Combine all deposits (admin repository + demo API + shared storage)
+          const allDeposits = [...result.deposits, ...demoDeposits, ...sharedDeposits];
+
+          // Remove duplicates by ID
+          const uniqueDeposits = allDeposits.filter((deposit, index, self) =>
+            index === self.findIndex(d => d.id === deposit.id)
+          );
+
+          // Apply filters to combined deposits
+          let filteredDeposits = uniqueDeposits;
+          if (status) {
+            filteredDeposits = filteredDeposits.filter(d => d.status === status);
+          }
+          if (customerId) {
+            filteredDeposits = filteredDeposits.filter(d => d.customerId === customerId);
+          }
+
+          // Apply limit
+          const limitValue = limit ? parseInt(limit) : 100;
+          const finalDeposits = filteredDeposits.slice(0, limitValue);
+
+          logAdminAction(adminAuth.user, 'VIEW_DEPOSITS', {
+            filters: { status, customerId, limit },
+            ip: clientIP,
+            adminCount: result.deposits.length,
+            demoCount: demoDeposits.length,
+            sharedCount: sharedDeposits.length,
+            totalCount: finalDeposits.length
+          });
+
+          console.log('📊 Admin API returning deposits:', {
+            admin: result.deposits.length,
+            demo: demoDeposits.length,
+            shared: sharedDeposits.length,
+            unique: uniqueDeposits.length,
+            final: finalDeposits.length
+          });
+
+          // Return combined result
+          return res.status(200).json({
+            deposits: finalDeposits,
+            total: filteredDeposits.length
+          });
+        } catch (error) {
+          console.error('❌ Error in admin deposits endpoint:', error);
+          return res.status(500).json({
+            error: 'Failed to fetch deposits',
+            details: error.message
+          });
         }
-        if (customerId) {
-          filteredDeposits = filteredDeposits.filter(d => d.customerId === customerId);
-        }
-
-        // Apply limit
-        const limitValue = limit ? parseInt(limit) : 100;
-        const finalDeposits = filteredDeposits.slice(0, limitValue);
-
-        logAdminAction(adminAuth.user, 'VIEW_DEPOSITS', {
-          filters: { status, customerId, limit },
-          ip: clientIP,
-          sharedCount: sharedDeposits.length,
-          totalCount: allDeposits.length
-        });
-
-        console.log('📊 Admin API returning deposits:', {
-          repository: result.deposits.length,
-          shared: sharedDeposits.length,
-          total: finalDeposits.length
-        });
-
-        // Return combined result
-        return res.status(200).json({
-          deposits: finalDeposits,
-          total: filteredDeposits.length
-        });
       }
 
       // Admin deposit creation endpoint
