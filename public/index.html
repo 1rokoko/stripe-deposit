@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Deposit Service</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        .logo {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .status {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #2e7d32;
+        }
+        .endpoints {
+            text-align: left;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .endpoint {
+            margin: 10px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9em;
+        }
+        .endpoint a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .endpoint a:hover {
+            text-decoration: underline;
+        }
+        .footer {
+            margin-top: 30px;
+            color: #999;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">💳</div>
+        <h1>Stripe Deposit Service</h1>
+        <p class="subtitle">Secure payment processing and deposit management</p>
+        
+        <div class="status">
+            ✅ Service is running successfully on Vercel
+        </div>
+        
+        <div class="endpoints">
+            <h3>Available Endpoints:</h3>
+            <div class="endpoint">
+                🔍 <a href="/healthz" target="_blank">/healthz</a> - Service health check
+            </div>
+            <div class="endpoint">
+                📊 <a href="/metrics" target="_blank">/metrics</a> - Service metrics
+            </div>
+            <div class="endpoint">
+                🧪 <a href="/api/demo" target="_blank">/api/demo</a> - Demo API endpoints
+            </div>
+            <div class="endpoint">
+                🔗 <a href="/api/stripe/webhook" target="_blank">/api/stripe/webhook</a> - Stripe webhooks
+            </div>
+            <div class="endpoint">
+                🔐 <a href="/api" target="_blank">/api</a> - Main API (requires auth)
+            </div>
+        </div>
+        
+        <div class="footer">
+            Deployed successfully to Vercel<br>
+            <small>Last updated: <span id="timestamp"></span></small>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>
