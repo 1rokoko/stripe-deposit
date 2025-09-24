@@ -8,8 +8,23 @@ const { NotificationService } = require('../src/services/notificationService');
 const { buildLogger } = require('../src/utils/logger');
 const { createDepositRepository } = require('../src/repositories/repositoryFactory');
 
-// Global singleton repository for serverless environment
-let globalRepository = null;
+// Repository factory function for serverless environment
+function createRepositoryForRequest() {
+  try {
+    console.log('Creating repository with DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
+    const repository = createDepositRepository({
+      type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory
+    });
+    console.log('✅ Created repository instance:', repository.constructor.name);
+    return repository;
+  } catch (error) {
+    console.error('❌ Failed to create repository:', error.message);
+    console.error('Falling back to MemoryDepositRepository');
+    // Fallback to inline memory repository
+    const { MemoryDepositRepository } = require('../src/repositories/memoryDepositRepository');
+    return new MemoryDepositRepository();
+  }
+}
 
 // Repository will be created using factory pattern
 
@@ -169,11 +184,8 @@ function checkRateLimit(clientIP, maxRequests = 100, windowMs = 60000) {
   };
 }
 
-// Service initialization
-let services = null;
-
+// Service initialization - create fresh services for each request in serverless
 function initializeServices() {
-  if (services) return services;
 
   const env = loadEnv();
   const logger = buildLogger('vercel-api');
@@ -186,21 +198,8 @@ function initializeServices() {
     throw new Error('API_AUTH_TOKEN environment variable is required');
   }
   
-  // Use global singleton repository for data persistence across requests
-  if (!globalRepository) {
-    try {
-      globalRepository = createDepositRepository({
-        type: 'auto' // Auto-detect: PostgreSQL -> SQLite -> Memory
-      });
-      console.log('Created new global repository instance');
-    } catch (error) {
-      console.error('Failed to create repository:', error);
-      // Fallback to inline memory repository
-      const { MemoryDepositRepository } = require('../src/repositories/memoryDepositRepository');
-      globalRepository = new MemoryDepositRepository();
-    }
-  }
-  const repository = globalRepository;
+  // Create fresh repository instance for each request in serverless environment
+  const repository = createRepositoryForRequest();
   const notificationService = new MemoryNotificationService({
     logger: buildLogger('notification-service'),
     externalWebhookUrl: env.ALERT_WEBHOOK_URL,
@@ -229,7 +228,8 @@ function initializeServices() {
   const jobHealthStore = new MemoryJobHealthStore();
   const webhookRetryQueue = new MemoryWebhookRetryQueue();
 
-  services = {
+  // Return fresh services for each request (no caching in serverless)
+  return {
     env,
     logger,
     repository,
@@ -239,8 +239,6 @@ function initializeServices() {
     webhookRetryQueue,
     notificationService
   };
-
-  return services;
 }
 
 // Import enhanced auth middleware
@@ -287,14 +285,32 @@ export default async function handler(req, res) {
       });
     }
 
-    // Health check (public)
+    // Health check (public) - includes database connectivity check
     if (pathname === '/healthz') {
-      return res.status(200).json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        service: 'stripe-deposit',
-        version: '1.0.0'
-      });
+      try {
+        // Test database connectivity
+        const repository = createRepositoryForRequest();
+        const dbHealth = await repository.healthCheck();
+
+        return res.status(200).json({
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          service: 'stripe-deposit',
+          version: '1.0.0',
+          database: dbHealth,
+          repository: repository.constructor.name
+        });
+      } catch (error) {
+        console.error('Health check failed:', error);
+        return res.status(503).json({
+          status: 'error',
+          timestamp: new Date().toISOString(),
+          service: 'stripe-deposit',
+          version: '1.0.0',
+          error: error.message,
+          database: { healthy: false, error: error.message }
+        });
+      }
     }
 
     // All Admin API endpoints (no main API auth required)

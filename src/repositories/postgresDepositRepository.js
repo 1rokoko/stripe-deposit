@@ -5,6 +5,24 @@
 
 const { Pool } = require('pg');
 
+// Retry helper for database operations
+async function retryOperation(operation, maxRetries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.log(`Database operation attempt ${attempt} failed:`, error.message);
+
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      // Wait before retry with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+}
+
 class PostgresDepositRepository {
   constructor(options = {}) {
     this.connectionString = options.connectionString || process.env.DATABASE_URL;
@@ -28,8 +46,9 @@ class PostgresDepositRepository {
   async #initialize() {
     if (this.initialized) return;
 
-    const client = await this.pool.connect();
-    try {
+    await retryOperation(async () => {
+      const client = await this.pool.connect();
+      try {
       // Create deposits table if it doesn't exist
       await client.query(`
         CREATE TABLE IF NOT EXISTS deposits (
@@ -65,10 +84,11 @@ class PostgresDepositRepository {
         CREATE INDEX IF NOT EXISTS idx_deposits_payment_method_id ON deposits(payment_method_id);
       `);
 
-      this.initialized = true;
-    } finally {
-      client.release();
-    }
+        this.initialized = true;
+      } finally {
+        client.release();
+      }
+    });
   }
 
   #toRow(deposit) {
@@ -133,14 +153,16 @@ class PostgresDepositRepository {
 
   async list() {
     await this.#initialize();
-    
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query('SELECT * FROM deposits ORDER BY created_at DESC');
-      return result.rows.map(row => ({ ...this.#fromRow(row) }));
-    } finally {
-      client.release();
-    }
+
+    return await retryOperation(async () => {
+      const client = await this.pool.connect();
+      try {
+        const result = await client.query('SELECT * FROM deposits ORDER BY created_at DESC');
+        return result.rows.map(row => ({ ...this.#fromRow(row) }));
+      } finally {
+        client.release();
+      }
+    });
   }
 
   async findById(id) {
@@ -158,30 +180,32 @@ class PostgresDepositRepository {
 
   async create(deposit) {
     await this.#initialize();
-    
-    const client = await this.pool.connect();
-    try {
-      // Check if deposit already exists
-      const existing = await client.query('SELECT 1 FROM deposits WHERE id = $1', [deposit.id]);
-      if (existing.rows.length > 0) {
-        throw new Error('Deposit with id ' + deposit.id + ' already exists');
+
+    return await retryOperation(async () => {
+      const client = await this.pool.connect();
+      try {
+        // Check if deposit already exists
+        const existing = await client.query('SELECT 1 FROM deposits WHERE id = $1', [deposit.id]);
+        if (existing.rows.length > 0) {
+          throw new Error('Deposit with id ' + deposit.id + ' already exists');
+        }
+
+        const row = this.#toRow(deposit);
+        const columns = Object.keys(row);
+        const values = Object.values(row);
+        const placeholders = columns.map((_, index) => `$${index + 1}`);
+
+        const query = `
+          INSERT INTO deposits (${columns.join(', ')})
+          VALUES (${placeholders.join(', ')})
+        `;
+
+        await client.query(query, values);
+        return { ...deposit };
+      } finally {
+        client.release();
       }
-
-      const row = this.#toRow(deposit);
-      const columns = Object.keys(row);
-      const values = Object.values(row);
-      const placeholders = columns.map((_, index) => `$${index + 1}`);
-
-      const query = `
-        INSERT INTO deposits (${columns.join(', ')})
-        VALUES (${placeholders.join(', ')})
-      `;
-
-      await client.query(query, values);
-      return { ...deposit };
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async update(id, updater) {
