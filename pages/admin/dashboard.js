@@ -3,6 +3,10 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 
+export async function getServerSideProps() {
+  return { props: {} };
+}
+
 export default function AdminDashboard() {
   const [admin, setAdmin] = useState(null);
   const [deposits, setDeposits] = useState([]);

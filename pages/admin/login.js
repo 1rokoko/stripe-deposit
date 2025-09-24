@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
+export async function getServerSideProps() {
+  return { props: {} };
+}
+
 export default function AdminLogin() {
   const [credentials, setCredentials] = useState({
     email: '',

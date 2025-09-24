@@ -3,6 +3,10 @@ import Head from 'next/head';
 import Link from 'next/link';
 import DepositStatus from '../components/DepositStatus';
 
+export async function getServerSideProps() {
+  return { props: {} };
+}
+
 export default function DepositsPage() {
   const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(true);
