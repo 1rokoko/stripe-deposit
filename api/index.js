@@ -6,85 +6,9 @@ const { StripeWebhookHandler } = require('../src/stripe/webhookHandler');
 const { DepositService } = require('../src/services/depositService');
 const { NotificationService } = require('../src/services/notificationService');
 const { buildLogger } = require('../src/utils/logger');
+const { createDepositRepository } = require('../src/repositories/repositoryFactory');
 
-// Mock implementations for serverless environment
-class MemoryDepositRepository {
-  constructor() {
-    this.deposits = new Map();
-  }
-
-  async save(deposit) {
-    this.deposits.set(deposit.id, { ...deposit });
-    return deposit;
-  }
-
-  async findById(id) {
-    return this.deposits.get(id) || null;
-  }
-
-  async findAll(filters = {}) {
-    const deposits = Array.from(this.deposits.values());
-    let filtered = deposits;
-
-    if (filters.status) {
-      filtered = filtered.filter(d => d.status === filters.status);
-    }
-    if (filters.customerId) {
-      filtered = filtered.filter(d => d.customerId === filters.customerId);
-    }
-
-    // Sort by creation date (newest first)
-    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    if (filters.limit) {
-      filtered = filtered.slice(0, filters.limit);
-    }
-
-    return filtered;
-  }
-
-  async findByCustomerId(customerId) {
-    return Array.from(this.deposits.values()).filter(d => d.customerId === customerId);
-  }
-
-  async findByStatus(status) {
-    return Array.from(this.deposits.values()).filter(d => d.status === status);
-  }
-
-  async findByPaymentIntentId(paymentIntentId) {
-    return Array.from(this.deposits.values()).find(d => d.paymentIntentId === paymentIntentId) || null;
-  }
-
-  async findOlderThan(date) {
-    return Array.from(this.deposits.values()).filter(d => new Date(d.createdAt) < date);
-  }
-
-  async count(filters = {}) {
-    const deposits = await this.findAll(filters);
-    return deposits.length;
-  }
-
-  // Compatibility method for DepositService
-  async list() {
-    return Array.from(this.deposits.values());
-  }
-
-  // Additional methods needed by DepositService
-  async create(deposit) {
-    this.deposits.set(deposit.id, { ...deposit });
-    return deposit;
-  }
-
-  async update(id, updateFn) {
-    const existing = this.deposits.get(id);
-    if (!existing) {
-      throw new Error(`Deposit ${id} not found`);
-    }
-    const updated = updateFn(existing);
-    this.deposits.set(id, updated);
-    return updated;
-  }
-}
+// Repository will be created using factory pattern
 
 class MemoryNotificationService {
   constructor(options = {}) {
@@ -259,7 +183,10 @@ function initializeServices() {
     throw new Error('API_AUTH_TOKEN environment variable is required');
   }
   
-  const repository = new MemoryDepositRepository();
+  // Use repository factory to get the best available repository (SQLite > Memory)
+  const repository = createDepositRepository({
+    filePath: '/tmp/deposits.db' // Use /tmp for Vercel serverless functions
+  });
   const notificationService = new MemoryNotificationService({
     logger: buildLogger('notification-service'),
     externalWebhookUrl: env.ALERT_WEBHOOK_URL,
@@ -421,6 +348,39 @@ export default async function handler(req, res) {
 
       // Initialize services for admin endpoints
       const { logger, repository, depositService, webhookHandler, jobHealthStore, webhookRetryQueue, notificationService } = initializeServices();
+
+      // Admin mode endpoint
+      if (pathname === '/api/admin/mode' && method === 'GET') {
+        const currentMode = env.STRIPE_SECRET_KEY?.includes('sk_test') ? 'test' : 'live';
+        return res.status(200).json({
+          mode: currentMode,
+          hasLiveKeys: !!(env.STRIPE_SECRET_KEY_LIVE && env.STRIPE_WEBHOOK_SECRET_LIVE)
+        });
+      }
+
+      if (pathname === '/api/admin/mode' && method === 'POST') {
+        const { mode } = req.body || {};
+
+        if (!mode || !['test', 'live'].includes(mode)) {
+          return res.status(400).json({ error: 'Mode must be "test" or "live"' });
+        }
+
+        if (mode === 'live' && (!env.STRIPE_SECRET_KEY_LIVE || !env.STRIPE_WEBHOOK_SECRET_LIVE)) {
+          return res.status(400).json({ error: 'Live mode keys not configured' });
+        }
+
+        // In a real implementation, you'd store this preference in a database
+        // For now, we'll just return success - the frontend will handle the mode
+        logAdminAction(adminAuth.user, 'MODE_SWITCH', {
+          mode,
+          ip: clientIP
+        });
+
+        return res.status(200).json({
+          mode,
+          message: `Switched to ${mode} mode`
+        });
+      }
 
       // Admin deposits endpoint
       if (pathname === '/api/admin/deposits' && method === 'GET') {

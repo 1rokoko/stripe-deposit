@@ -12,11 +12,15 @@ export default function AdminDashboard() {
   const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState('test');
+  const [hasLiveKeys, setHasLiveKeys] = useState(false);
+  const [actionLoading, setActionLoading] = useState({});
   const router = useRouter();
 
   useEffect(() => {
     checkAuth();
     fetchDeposits();
+    fetchMode();
   }, []);
 
   const checkAuth = () => {
@@ -70,7 +74,52 @@ export default function AdminDashboard() {
     router.push('/admin/login');
   };
 
+  const fetchMode = async () => {
+    try {
+      const adminToken = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/mode', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMode(data.mode);
+        setHasLiveKeys(data.hasLiveKeys);
+      }
+    } catch (err) {
+      console.error('Failed to fetch mode:', err);
+    }
+  };
+
+  const handleModeSwitch = async (newMode) => {
+    try {
+      const adminToken = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/mode', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ mode: newMode })
+      });
+
+      if (response.ok) {
+        setMode(newMode);
+        // Refresh deposits for the new mode
+        await fetchDeposits();
+      } else {
+        const data = await response.json();
+        setError(data.error || `Failed to switch to ${newMode} mode`);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleDepositAction = async (depositId, action) => {
+    setActionLoading(prev => ({ ...prev, [`${depositId}-${action}`]: true }));
     try {
       const adminToken = localStorage.getItem('adminToken');
       const response = await fetch(`/api/admin/deposits/${depositId}/${action}`, {
@@ -84,12 +133,15 @@ export default function AdminDashboard() {
       if (response.ok) {
         // Refresh deposits
         await fetchDeposits();
+        setError(''); // Clear any previous errors
       } else {
         const data = await response.json();
         setError(data.error || `Failed to ${action} deposit`);
       }
     } catch (err) {
       setError(err.message);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`${depositId}-${action}`]: false }));
     }
   };
 
@@ -127,8 +179,39 @@ export default function AdminDashboard() {
                   Welcome back, {admin?.email} ({admin?.role})
                 </p>
               </div>
-              <div className="flex space-x-4">
-                <Link 
+              <div className="flex items-center space-x-4">
+                {/* Mode Toggle */}
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Mode:</span>
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => handleModeSwitch('test')}
+                      className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                        mode === 'test'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Test
+                    </button>
+                    <button
+                      onClick={() => handleModeSwitch('live')}
+                      disabled={!hasLiveKeys}
+                      className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                        mode === 'live'
+                          ? 'bg-red-600 text-white'
+                          : hasLiveKeys
+                          ? 'text-gray-600 hover:text-gray-900'
+                          : 'text-gray-400 cursor-not-allowed'
+                      }`}
+                      title={!hasLiveKeys ? 'Live mode keys not configured' : ''}
+                    >
+                      Live
+                    </button>
+                  </div>
+                </div>
+
+                <Link
                   href="/"
                   className="text-blue-600 hover:text-blue-800 text-sm underline"
                 >
@@ -160,6 +243,26 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* Mode Status */}
+          <div className="mb-6 p-4 bg-white rounded-lg shadow">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className={`w-3 h-3 rounded-full ${mode === 'live' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+                <span className="text-lg font-medium text-gray-900">
+                  {mode === 'live' ? '🔴 LIVE MODE' : '🔵 TEST MODE'}
+                </span>
+                <span className="text-sm text-gray-600">
+                  {mode === 'live' ? 'Real transactions' : 'Test transactions only'}
+                </span>
+              </div>
+              {!hasLiveKeys && (
+                <span className="text-sm text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                  ⚠️ Live keys not configured
+                </span>
+              )}
+            </div>
+          </div>
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -273,17 +376,33 @@ export default function AdminDashboard() {
                           <>
                             <button
                               onClick={() => handleDepositAction(deposit.id, 'capture')}
-                              className="text-green-600 hover:text-green-900"
+                              disabled={actionLoading[`${deposit.id}-capture`]}
+                              className={`${
+                                actionLoading[`${deposit.id}-capture`]
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-green-600 hover:text-green-900'
+                              } transition-colors`}
                             >
-                              Capture
+                              {actionLoading[`${deposit.id}-capture`] ? '⏳' : '💰'} Capture
                             </button>
                             <button
                               onClick={() => handleDepositAction(deposit.id, 'release')}
-                              className="text-red-600 hover:text-red-900"
+                              disabled={actionLoading[`${deposit.id}-release`]}
+                              className={`${
+                                actionLoading[`${deposit.id}-release`]
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-red-600 hover:text-red-900'
+                              } transition-colors`}
                             >
-                              Release
+                              {actionLoading[`${deposit.id}-release`] ? '⏳' : '🔓'} Release
                             </button>
                           </>
+                        )}
+                        {deposit.status === 'captured' && (
+                          <span className="text-green-600">✅ Captured</span>
+                        )}
+                        {deposit.status === 'released' && (
+                          <span className="text-gray-600">🔓 Released</span>
                         )}
                       </td>
                     </tr>

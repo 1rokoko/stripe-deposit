@@ -31,7 +31,9 @@ function loadEnv() {
 
   return {
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_SECRET_KEY_LIVE: process.env.STRIPE_SECRET_KEY_LIVE,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    STRIPE_WEBHOOK_SECRET_LIVE: process.env.STRIPE_WEBHOOK_SECRET_LIVE,
     PORT: process.env.PORT ? Number(process.env.PORT) : 3000,
     DATA_FILE: process.env.DATA_FILE || path.join(dataDir, 'deposits.json'),
     DATABASE_FILE: process.env.DATABASE_FILE || path.join(dataDir, 'deposits.sqlite'),
