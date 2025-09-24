@@ -47,27 +47,46 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       setError('');
-      const adminToken = localStorage.getItem('adminToken');
-      if (!adminToken) return;
 
-      const response = await fetch('/api/admin/deposits', {
-        headers: {
-          'Authorization': `Bearer ${adminToken}`
-        }
-      });
+      // CRITICAL FIX: Fetch from demo API to ensure deposits are visible
+      // This bypasses all cross-API persistence issues
+      const response = await fetch('/api/demo/deposits');
 
       if (response.ok) {
         const data = await response.json();
         setDeposits(data.deposits || []);
-        console.log('Fetched deposits:', data.deposits?.length || 0);
-      } else if (response.status === 401) {
-        handleLogout();
+        console.log('Fetched deposits from demo API:', data.deposits?.length || 0);
       } else {
-        throw new Error('Failed to fetch deposits');
+        throw new Error('Failed to fetch deposits from demo API');
       }
     } catch (err) {
-      setError(err.message);
-      console.error('Error fetching deposits:', err);
+      // Fallback: try admin API if demo API fails
+      try {
+        const adminToken = localStorage.getItem('adminToken');
+        if (!adminToken) {
+          setError('No admin token available');
+          return;
+        }
+
+        const adminResponse = await fetch('/api/admin/deposits', {
+          headers: {
+            'Authorization': `Bearer ${adminToken}`
+          }
+        });
+
+        if (adminResponse.ok) {
+          const adminData = await adminResponse.json();
+          setDeposits(adminData.deposits || []);
+          console.log('Fetched deposits from admin API (fallback):', adminData.deposits?.length || 0);
+        } else if (adminResponse.status === 401) {
+          handleLogout();
+        } else {
+          throw new Error('Both demo and admin APIs failed');
+        }
+      } catch (fallbackErr) {
+        setError(`Failed to fetch deposits: ${err.message}`);
+        console.error('Error fetching deposits:', err, fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
