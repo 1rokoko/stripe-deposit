@@ -49,14 +49,14 @@ export default function AdminDashboard() {
       setLoading(true);
       setError('');
 
-      // WORKING SOLUTION: Fetch from demo API without authentication
-      console.log('🔄 Fetching deposits from demo API...');
+      // FORCE DEPLOY: Fetch from demo API without authentication - Updated at 2025-09-24
+      console.log('🔄 FORCE DEPLOY: Fetching deposits from demo API...');
       const response = await fetch('/api/demo/deposits');
 
       if (response.ok) {
         const data = await response.json();
         setDeposits(data.deposits || []);
-        console.log('✅ SUCCESS: Fetched', data.deposits?.length || 0, 'deposits from demo API');
+        console.log('🔄 FORCE DEPLOY: Successfully fetched', data.deposits?.length || 0, 'deposits from demo API at', new Date().toISOString());
       } else {
         console.error('❌ Demo API failed:', response.status);
         setError('Failed to fetch deposits from demo API');
