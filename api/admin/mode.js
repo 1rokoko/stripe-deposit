@@ -36,15 +36,16 @@ async function handleGetMode(req, res) {
     // Default to test mode
     const mode = 'test';
 
-    // Debug information
-    console.log('🔍 Environment debug:', {
+    // Debug information - Environment variables check
+    console.log('🔍 Environment debug (updated):', {
       hasLiveKeys,
       testKey: !!process.env.STRIPE_SECRET_KEY,
       liveKey: !!process.env.STRIPE_SECRET_KEY_LIVE,
       jwtSecret: !!process.env.JWT_SECRET,
       apiToken: !!process.env.API_AUTH_TOKEN,
       nodeEnv: process.env.NODE_ENV,
-      allStripeKeys: Object.keys(process.env).filter(key => key.includes('STRIPE'))
+      allStripeKeys: Object.keys(process.env).filter(key => key.includes('STRIPE')),
+      timestamp: new Date().toISOString()
     });
 
     return res.status(200).json({
