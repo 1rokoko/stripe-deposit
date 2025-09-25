@@ -261,6 +261,12 @@ export default async function handler(req, res) {
             // Ensure capturedAmount is properly set (amount comes in cents from admin API)
             const captureAmount = req.body?.amount || deposit.holdAmount;
             console.log(`🔍 Demo capture: requested=${req.body?.amount}, holdAmount=${deposit.holdAmount}, using=${captureAmount}`);
+            console.log(`🔍 Demo capture deposit details:`, JSON.stringify({
+              id: deposit.id,
+              holdAmount: deposit.holdAmount,
+              status: deposit.status,
+              requestBody: req.body
+            }, null, 2));
 
             updatedDeposit = await repository.update(depositId, (current) => ({
               ...current,
@@ -318,6 +324,13 @@ export default async function handler(req, res) {
 
             console.log(`🔍 Demo refund: requestedCents=${refundAmount}, maxRefund=${maxRefundAmount}, alreadyRefunded=${alreadyRefunded}, available=${availableForRefund}`);
             console.log(`🔍 Demo refund validation: ${refundAmount} > ${availableForRefund} = ${refundAmount > availableForRefund}`);
+            console.log(`🔍 Demo refund deposit details:`, JSON.stringify({
+              id: deposit.id,
+              holdAmount: deposit.holdAmount,
+              capturedAmount: deposit.capturedAmount,
+              refundedAmount: deposit.refundedAmount,
+              status: deposit.status
+            }, null, 2));
 
             if (!refundAmount || refundAmount <= 0) {
               return res.status(400).json({

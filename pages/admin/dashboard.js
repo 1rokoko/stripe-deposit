@@ -146,7 +146,7 @@ export default function AdminDashboard() {
         return;
       }
 
-      const body = amount ? { amount: Math.round(amount * 100) } : {};
+      const body = amount ? { amount: amount } : {};
 
       // Use proper admin API for actions
       const response = await fetch(`/api/admin/deposits/${depositId}/${action}`, {
