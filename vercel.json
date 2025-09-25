@@ -4,21 +4,9 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "functions": {
-    "api/index.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
     "api/stripe/webhook.js": {
       "memory": 512,
       "maxDuration": 15
-    },
-    "api/metrics.js": {
-      "memory": 256,
-      "maxDuration": 10
-    },
-    "api/healthz.js": {
-      "memory": 128,
-      "maxDuration": 5
     },
     "api/demo.js": {
       "memory": 256,
@@ -34,14 +22,6 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/healthz",
-      "destination": "/api/healthz"
-    },
-    {
-      "source": "/metrics",
-      "destination": "/api/metrics"
-    },
     {
       "source": "/api/demo/(.*)",
       "destination": "/api/demo"
