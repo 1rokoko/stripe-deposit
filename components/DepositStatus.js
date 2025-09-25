@@ -140,10 +140,10 @@ export default function DepositStatus({ deposits, onAction, onRefresh }) {
                     <span className="font-medium">Amount:</span> {formatAmount(deposit.amount)}
                   </div>
                   <div>
-                    <span className="font-medium">Customer:</span> {deposit.customer_id}
+                    <span className="font-medium">Customer:</span> {deposit.customerId || deposit.customer_id}
                   </div>
                   <div>
-                    <span className="font-medium">Created:</span> {formatDate(deposit.created_at)}
+                    <span className="font-medium">Created:</span> {formatDate(deposit.createdAt || deposit.created_at)}
                   </div>
                 </div>
               </div>
@@ -229,25 +229,25 @@ export default function DepositStatus({ deposits, onAction, onRefresh }) {
               </div>
               <div>
                 <span className="font-medium text-gray-700">Customer ID:</span>
-                <div className="font-mono text-gray-900">{selectedDeposit.customer_id}</div>
+                <div className="font-mono text-gray-900">{selectedDeposit.customerId || selectedDeposit.customer_id}</div>
               </div>
               <div>
                 <span className="font-medium text-gray-700">Created:</span>
-                <div className="text-gray-900">{formatDate(selectedDeposit.created_at)}</div>
+                <div className="text-gray-900">{formatDate(selectedDeposit.createdAt || selectedDeposit.created_at)}</div>
               </div>
-              {selectedDeposit.updated_at && (
+              {(selectedDeposit.updated_at || selectedDeposit.updatedAt) && (
                 <div>
                   <span className="font-medium text-gray-700">Updated:</span>
-                  <div className="text-gray-900">{formatDate(selectedDeposit.updated_at)}</div>
+                  <div className="text-gray-900">{formatDate(selectedDeposit.updatedAt || selectedDeposit.updated_at)}</div>
                 </div>
               )}
             </div>
 
-            {selectedDeposit.payment_intent_id && (
+            {(selectedDeposit.payment_intent_id || selectedDeposit.paymentIntentId) && (
               <div>
                 <span className="font-medium text-gray-700">Payment Intent ID:</span>
                 <div className="font-mono text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {selectedDeposit.payment_intent_id}
+                  {selectedDeposit.paymentIntentId || selectedDeposit.payment_intent_id}
                 </div>
               </div>
             )}

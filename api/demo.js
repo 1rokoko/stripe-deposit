@@ -1,4 +1,4 @@
-// Demo endpoint with shared repository
+// Demo endpoint with shared repository - FINAL TESTING VERSION
 const { createDepositRepository } = require('../src/repositories/repositoryFactory');
 
 // Shared storage for cross-API persistence
@@ -203,13 +203,47 @@ export default async function handler(req, res) {
 
       try {
         // Find the deposit in repository
+        console.log(`🔍 Looking for deposit ${depositId} in repository...`);
         const deposit = await repository.findById(depositId);
+        console.log(`📋 Found deposit:`, deposit ? 'YES' : 'NO');
+
         if (!deposit) {
+          // Try to find in shared storage as fallback
+          const sharedDeposit = global.CROSS_API_DEPOSITS?.get(depositId);
+          console.log(`📋 Found in shared storage:`, sharedDeposit ? 'YES' : 'NO');
+
+          if (sharedDeposit) {
+            // Save to repository for future access
+            await repository.save(sharedDeposit);
+            console.log(`💾 Saved shared deposit to repository`);
+            return await handleDepositAction(sharedDeposit, action, req, res, repository, depositId);
+          }
+
           return res.status(404).json({
             error: 'Deposit not found',
-            depositId
+            depositId,
+            debug: {
+              repositoryType: repository.constructor.name,
+              sharedStorageSize: global.CROSS_API_DEPOSITS?.size || 0
+            }
           });
         }
+
+        return await handleDepositAction(deposit, action, req, res, repository, depositId);
+      } catch (error) {
+        console.error(`❌ Error in deposit action ${action}:`, error);
+        return res.status(500).json({
+          error: 'Internal server error',
+          message: error.message,
+          action,
+          depositId
+        });
+      }
+    }
+
+    // Helper function to handle deposit actions
+    async function handleDepositAction(deposit, action, req, res, repository, depositId) {
+      try {
 
         const now = new Date();
         let updatedDeposit;

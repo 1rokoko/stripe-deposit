@@ -94,6 +94,10 @@ class FileDepositRepository {
     return deleted;
   }
 
+  async list() {
+    return Array.from(this.deposits.values());
+  }
+
   async healthCheck() {
     try {
       // Test file operations
