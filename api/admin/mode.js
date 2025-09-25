@@ -32,16 +32,34 @@ async function handleGetMode(req, res) {
   try {
     // Check if live keys are configured
     const hasLiveKeys = !!(process.env.STRIPE_SECRET_KEY_LIVE && process.env.STRIPE_WEBHOOK_SECRET_LIVE);
-    
+
     // Default to test mode
     const mode = 'test';
+
+    // Debug information
+    console.log('🔍 Environment debug:', {
+      hasLiveKeys,
+      testKey: !!process.env.STRIPE_SECRET_KEY,
+      liveKey: !!process.env.STRIPE_SECRET_KEY_LIVE,
+      jwtSecret: !!process.env.JWT_SECRET,
+      apiToken: !!process.env.API_AUTH_TOKEN,
+      nodeEnv: process.env.NODE_ENV,
+      allStripeKeys: Object.keys(process.env).filter(key => key.includes('STRIPE'))
+    });
 
     return res.status(200).json({
       success: true,
       mode,
       hasLiveKeys,
       testKeyConfigured: !!process.env.STRIPE_SECRET_KEY,
-      liveKeyConfigured: !!process.env.STRIPE_SECRET_KEY_LIVE
+      liveKeyConfigured: !!process.env.STRIPE_SECRET_KEY_LIVE,
+      debug: {
+        nodeEnv: process.env.NODE_ENV,
+        stripeKeysFound: Object.keys(process.env).filter(key => key.includes('STRIPE')),
+        hasJwt: !!process.env.JWT_SECRET,
+        hasApiToken: !!process.env.API_AUTH_TOKEN,
+        totalEnvVars: Object.keys(process.env).length
+      }
     });
 
   } catch (error) {
