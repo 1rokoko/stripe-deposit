@@ -46,7 +46,7 @@ export default function Home() {
     setAlert(null);
 
     try {
-      console.log(`🔄 Creating deposit in ${mode} mode...`);
+      console.log(`🔄 Creating deposit in ${mode} mode with new endpoint...`);
 
       // Generate automatic customer ID
       const customerId = `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -72,7 +72,7 @@ export default function Home() {
         });
       } else {
         // Use live API for live mode
-        response = await fetch('/api/deposits/create-live', {
+        response = await fetch('/api/deposits/create-payment', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
