@@ -4,7 +4,7 @@ import { Input } from './ui/Input';
 import { Card } from './ui/Card';
 import { Alert } from './ui/Alert';
 
-export default function DepositForm({ onSubmit, loading = false }) {
+export default function DepositForm({ onSubmit, loading = false, mode = 'test' }) {
   const [formData, setFormData] = useState({
     amount: '',
     customerId: '',
@@ -151,9 +151,18 @@ export default function DepositForm({ onSubmit, loading = false }) {
         </div>
       )}
 
-      {/* Test Cards Section */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Test Cards (Demo Mode)</h3>
+      {/* Mode-specific warnings and test cards */}
+      {mode === 'live' ? (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <h3 className="text-sm font-medium text-red-800 mb-2">⚠️ LIVE MODE WARNING</h3>
+          <p className="text-sm text-red-700">
+            You are in LIVE mode. Real charges will be made to your card.
+            Only use real card information that you own.
+          </p>
+        </div>
+      ) : (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Test Cards (Demo Mode)</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {testCards.map((card, index) => (
             <button
@@ -172,8 +181,9 @@ export default function DepositForm({ onSubmit, loading = false }) {
               <div className="text-gray-400 font-mono">{card.number}</div>
             </button>
           ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

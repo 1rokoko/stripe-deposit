@@ -11,21 +11,28 @@ export default function Home() {
   const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(null);
+  const [mode, setMode] = useState('test'); // test or live
 
   useEffect(() => {
-    // Load demo deposits on page load
-    fetchDemoDeposits();
-  }, []);
+    // Load deposits on page load and when mode changes
+    fetchDeposits();
+  }, [mode]);
 
-  const fetchDemoDeposits = async () => {
+  const fetchDeposits = async () => {
     try {
-      // Try to fetch from demo API for backward compatibility
-      const response = await fetch('/api/demo/deposits');
+      console.log(`🔄 Fetching deposits from ${mode} mode...`);
+      const response = await fetch('/api/deposits/list', {
+        headers: {
+          'x-stripe-mode': mode
+        }
+      });
+
       if (response.ok) {
         const data = await response.json();
         setDeposits(data.deposits || []);
+        console.log(`✅ Successfully fetched ${data.deposits?.length || 0} deposits from ${mode} mode`);
       } else {
-        console.error('Failed to fetch deposits from demo API');
+        console.error(`Failed to fetch deposits from ${mode} mode`);
         setDeposits([]);
       }
     } catch (error) {
@@ -39,29 +46,54 @@ export default function Home() {
     setAlert(null);
 
     try {
-      // Use the amount from the form, default to 100 if not specified
-      const amount = Math.round(parseFloat(formData.amount) || 100);
+      console.log(`🔄 Creating deposit in ${mode} mode...`);
 
-      // Use demo API for creating deposits
-      const response = await fetch(`/api/demo/deposits/hold/${amount}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          customerId: formData.customerId,
-          metadata: {
-            demo: true,
-            cardNumber: formData.cardNumber.slice(-4),
-            requestedAmount: formData.amount,
+      let response, result;
+
+      if (mode === 'test') {
+        // Use demo API for test mode
+        const amount = Math.round(parseFloat(formData.amount) || 100);
+        response = await fetch(`/api/demo/deposits/hold/${amount}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
           },
-        }),
-      });
+          body: JSON.stringify({
+            customerId: formData.customerId,
+            metadata: {
+              demo: true,
+              cardNumber: formData.cardNumber.slice(-4),
+              requestedAmount: formData.amount,
+            },
+          }),
+        });
+      } else {
+        // Use live API for live mode
+        response = await fetch('/api/deposits/create-with-card', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-stripe-mode': mode
+          },
+          body: JSON.stringify({
+            amount: formData.amount,
+            customerId: formData.customerId,
+            cardNumber: formData.cardNumber,
+            expMonth: formData.expMonth,
+            expYear: formData.expYear,
+            cvc: formData.cvc,
+            metadata: {
+              created_via: 'main_page',
+              cardLast4: formData.cardNumber.slice(-4)
+            }
+          }),
+        });
+      }
 
-      const result = await response.json();
+      result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create deposit');
+        throw new Error(result.error || result.details || 'Failed to create deposit');
       }
 
       // Add the new deposit to the list
@@ -72,7 +104,10 @@ export default function Home() {
         message: `Deposit created successfully! ID: ${result.deposit.id}`,
       });
 
+      console.log(`✅ Deposit created successfully in ${mode} mode: ${result.deposit.id}`);
+
     } catch (error) {
+      console.error(`❌ Error creating deposit in ${mode} mode:`, error);
       setAlert({
         type: 'error',
         message: error.message || 'Failed to create deposit',
@@ -104,7 +139,7 @@ export default function Home() {
       });
 
       // Refresh deposits list
-      fetchDemoDeposits();
+      fetchDeposits();
 
     } catch (error) {
       setAlert({
@@ -133,6 +168,49 @@ export default function Home() {
             <p className="text-xl text-gray-600">
               Secure payment processing and deposit management
             </p>
+
+            {/* Mode Switcher */}
+            <div className="mt-6 flex justify-center">
+              <div className="bg-white rounded-lg p-1 shadow-md border">
+                <div className="flex items-center space-x-1">
+                  <span className="text-sm font-medium text-gray-700 px-3">Mode:</span>
+                  <button
+                    onClick={() => setMode('test')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      mode === 'test'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    Test
+                  </button>
+                  <button
+                    onClick={() => setMode('live')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      mode === 'live'
+                        ? 'bg-red-100 text-red-800 border border-red-200'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    Live
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode Indicator */}
+            <div className="mt-4">
+              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                mode === 'test'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                {mode === 'test' ? '🔵 TEST MODE' : '🔴 LIVE MODE'}
+                <span className="ml-2 text-xs">
+                  {mode === 'test' ? 'Test transactions only' : 'Real transactions'}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Alert */}
@@ -157,9 +235,10 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Deposit Form */}
             <div>
-              <DepositForm 
+              <DepositForm
                 onSubmit={handleDepositSubmit}
                 loading={loading}
+                mode={mode}
               />
             </div>
 
@@ -178,11 +257,14 @@ export default function Home() {
               🔒 All transactions are processed securely through Stripe
             </p>
             <p className="mt-2">
-              Demo mode - No real charges are made
+              {mode === 'test'
+                ? 'Test mode - No real charges are made'
+                : '⚠️ Live mode - Real charges will be made'
+              }
             </p>
             <div className="mt-4">
-              <a 
-                href="/admin" 
+              <a
+                href="/admin"
                 className="text-blue-600 hover:text-blue-800 underline"
               >
                 Admin Panel
