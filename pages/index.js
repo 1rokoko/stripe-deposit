@@ -19,7 +19,7 @@ export default function Home() {
 
   const fetchDemoDeposits = async () => {
     try {
-      // Fetch from demo API only
+      // Try to fetch from demo API for backward compatibility
       const response = await fetch('/api/demo/deposits');
       if (response.ok) {
         const data = await response.json();

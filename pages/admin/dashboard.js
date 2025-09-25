@@ -50,21 +50,34 @@ export default function AdminDashboard() {
       setLoading(true);
       setError('');
 
-      // FORCE DEPLOY: Fetch from demo API without authentication - Updated at 2025-09-24
+      const adminToken = localStorage.getItem('adminToken');
+      if (!adminToken) {
+        setError('Authentication required');
+        return;
+      }
+
+      // Use proper admin API based on current mode
       const timestamp = new Date().toISOString();
-      console.log('🔄 FORCE DEPLOY: Fetching deposits from demo API...', forceRefresh ? '(FORCE REFRESH)' : '', timestamp);
+      console.log(`🔄 Fetching deposits from ${mode} mode...`, forceRefresh ? '(FORCE REFRESH)' : '', timestamp);
 
       // Add cache busting parameter for force refresh
-      const url = forceRefresh ? `/api/demo/deposits?_t=${Date.now()}` : '/api/demo/deposits';
-      const response = await fetch(url);
+      const url = forceRefresh ? `/api/admin/deposits?_t=${Date.now()}` : '/api/admin/deposits';
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+          'X-Stripe-Mode': mode
+        }
+      });
 
       if (response.ok) {
         const data = await response.json();
         setDeposits(data.deposits || []);
-        console.log('🔄 FORCE DEPLOY: Successfully fetched', data.deposits?.length || 0, 'deposits from demo API at', new Date().toISOString());
+        console.log(`✅ Successfully fetched ${data.deposits?.length || 0} deposits from ${mode} mode at`, new Date().toISOString());
       } else {
-        console.error('❌ Demo API failed:', response.status);
-        setError('Failed to fetch deposits from demo API');
+        console.error(`❌ Admin API failed:`, response.status);
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.error || `Failed to fetch deposits from ${mode} mode`);
       }
     } catch (err) {
       console.error('❌ Error fetching deposits:', err);
@@ -126,13 +139,21 @@ export default function AdminDashboard() {
   const handleDepositAction = async (depositId, action, amount = null) => {
     setActionLoading(prev => ({ ...prev, [`${depositId}-${action}`]: true }));
     try {
+      const adminToken = localStorage.getItem('adminToken');
+      if (!adminToken) {
+        setError('Authentication required');
+        return;
+      }
+
       const body = amount ? { amount: Math.round(amount * 100) } : {};
 
-      // Use demo API for actions since that's where deposits are stored
-      const response = await fetch(`/api/demo/deposits/${depositId}/${action}`, {
+      // Use proper admin API for actions
+      const response = await fetch(`/api/admin/deposits/${depositId}/${action}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+          'X-Stripe-Mode': mode
         },
         body: JSON.stringify(body)
       });
