@@ -319,7 +319,7 @@ export default async function handler(req, res) {
             console.log(`🔍 Demo refund: requestedCents=${refundAmount}, maxRefund=${maxRefundAmount}, alreadyRefunded=${alreadyRefunded}, available=${availableForRefund}`);
             console.log(`🔍 Demo refund validation: ${refundAmount} > ${availableForRefund} = ${refundAmount > availableForRefund}`);
 
-            if (!refundAmountInDollars || refundAmountInDollars <= 0) {
+            if (!refundAmount || refundAmount <= 0) {
               return res.status(400).json({
                 error: 'Refund amount must be specified and greater than 0',
                 availableForRefund: availableForRefund / 100
@@ -332,7 +332,7 @@ export default async function handler(req, res) {
                 maxRefundAmount: maxRefundAmount / 100,
                 alreadyRefunded: alreadyRefunded / 100,
                 availableForRefund: availableForRefund / 100,
-                requestedAmount: refundAmountInDollars
+                requestedAmount: refundAmount / 100
               });
             }
 

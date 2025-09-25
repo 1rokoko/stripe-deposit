@@ -104,7 +104,10 @@ async function handleDepositAction(req, res, depositId, action) {
         let refundResult;
 
         // Convert amount from dollars to cents if needed
+        // Note: amount comes from frontend in dollars, need to convert to cents for Stripe API
         const refundAmountInCents = amount ? Math.round(amount * 100) : undefined;
+
+        console.log(`🔍 Live refund: amount=${amount}, refundAmountInCents=${refundAmountInCents}`);
 
         if (paymentIntent.charges?.data?.[0]) {
           // Method 1: Refund via Charge (preferred for newer payment intents)
