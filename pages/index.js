@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import DepositForm from '../components/DepositForm';
 import StripeCardForm from '../components/StripeCardForm';
@@ -9,10 +10,21 @@ export async function getServerSideProps() {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(null);
   const [mode, setMode] = useState('test'); // test or live
+
+  // Read mode from URL parameter
+  useEffect(() => {
+    if (router.isReady) {
+      const urlMode = router.query.mode;
+      if (urlMode === 'live' || urlMode === 'test') {
+        setMode(urlMode);
+      }
+    }
+  }, [router.isReady, router.query.mode]);
 
   useEffect(() => {
     // Load deposits on page load and when mode changes
@@ -250,7 +262,10 @@ export default function Home() {
                 <div className="flex items-center space-x-1">
                   <span className="text-sm font-medium text-gray-700 px-3">Mode:</span>
                   <button
-                    onClick={() => setMode('test')}
+                    onClick={() => {
+                      setMode('test');
+                      router.push('/?mode=test');
+                    }}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                       mode === 'test'
                         ? 'bg-blue-100 text-blue-800 border border-blue-200'
@@ -260,7 +275,10 @@ export default function Home() {
                     Test
                   </button>
                   <button
-                    onClick={() => setMode('live')}
+                    onClick={() => {
+                      setMode('live');
+                      router.push('/?mode=live');
+                    }}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                       mode === 'live'
                         ? 'bg-red-100 text-red-800 border border-red-200'
