@@ -30,20 +30,48 @@ async function handleDepositAction(req, res, depositId, action) {
   try {
     // Get admin mode from session or default to test
     const mode = req.headers['x-stripe-mode'] || 'test';
-    
-    // Import Stripe with appropriate key
-    const stripe = require('stripe')(
-      mode === 'live' 
-        ? process.env.STRIPE_SECRET_KEY_LIVE 
-        : process.env.STRIPE_SECRET_KEY
-    );
-
     const { amount } = req.body;
+
+    console.log(`🔄 Admin action: ${action} on ${depositId} in ${mode} mode`);
+
+    if (mode === 'test') {
+      // In test mode, use demo API for actions
+      try {
+        const demoResponse = await fetch(`https://stripe-deposit.vercel.app/api/demo/deposits/${depositId}/${action}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ amount: amount ? Math.round(amount * 100) : undefined })
+        });
+
+        if (demoResponse.ok) {
+          const result = await demoResponse.json();
+          console.log(`✅ Demo action successful: ${action} on ${depositId}`);
+          return res.status(200).json(result);
+        } else {
+          const errorData = await demoResponse.json();
+          console.error(`❌ Demo action failed: ${action} on ${depositId}:`, errorData);
+          return res.status(demoResponse.status).json(errorData);
+        }
+      } catch (demoError) {
+        console.error(`❌ Demo API error for ${action} on ${depositId}:`, demoError);
+        return res.status(500).json({
+          error: `Failed to ${action} demo deposit`,
+          details: demoError.message
+        });
+      }
+    }
+
+    // For live mode, use Stripe API
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY_LIVE);
 
     switch (action) {
       case 'capture':
+        // Convert amount from dollars to cents if needed
+        const captureAmountInCents = amount ? Math.round(amount * 100) : undefined;
         const captureResult = await stripe.paymentIntents.capture(depositId, {
-          amount_to_capture: amount
+          amount_to_capture: captureAmountInCents
         });
         
         return res.status(200).json({
@@ -75,18 +103,21 @@ async function handleDepositAction(req, res, depositId, action) {
 
         let refundResult;
 
+        // Convert amount from dollars to cents if needed
+        const refundAmountInCents = amount ? Math.round(amount * 100) : undefined;
+
         if (paymentIntent.charges?.data?.[0]) {
           // Method 1: Refund via Charge (preferred for newer payment intents)
           const charge = paymentIntent.charges.data[0];
           refundResult = await stripe.refunds.create({
             charge: charge.id,
-            amount: amount
+            amount: refundAmountInCents
           });
         } else {
           // Method 2: Refund via Payment Intent (for older payment intents without charges)
           refundResult = await stripe.refunds.create({
             payment_intent: paymentIntent.id,
-            amount: amount
+            amount: refundAmountInCents
           });
         }
 

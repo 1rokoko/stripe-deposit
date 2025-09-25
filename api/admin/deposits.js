@@ -30,13 +30,58 @@ async function handleGetDeposits(req, res) {
   try {
     // Get admin mode from session or default to test
     const mode = req.headers['x-stripe-mode'] || 'test';
-    
-    // Import Stripe with appropriate key
-    const stripe = require('stripe')(
-      mode === 'live' 
-        ? process.env.STRIPE_SECRET_KEY_LIVE 
-        : process.env.STRIPE_SECRET_KEY
-    );
+
+    console.log(`🔄 Fetching deposits from ${mode} mode...`, new Date().toISOString());
+
+    if (mode === 'test') {
+      // In test mode, fetch from demo API to show demo deposits
+      try {
+        const demoResponse = await fetch('https://stripe-deposit.vercel.app/api/demo/deposits');
+        if (demoResponse.ok) {
+          const demoData = await demoResponse.json();
+          const demoDeposits = demoData.deposits || [];
+
+          // Convert demo deposits to admin format
+          const formattedDeposits = demoDeposits.map(deposit => ({
+            id: deposit.id,
+            customer: deposit.customerId || 'Unknown',
+            amount: deposit.amount, // Already in cents
+            currency: deposit.currency || 'usd',
+            status: deposit.status,
+            created: new Date(deposit.createdAt).getTime() / 1000,
+            metadata: deposit.metadata || {},
+            // Add fields for refund functionality
+            capturedAmount: deposit.status === 'captured' ? deposit.amount : 0,
+            refundedAmount: deposit.refundedAmount || 0
+          }));
+
+          console.log(`✅ Successfully fetched ${formattedDeposits.length} deposits from test mode at ${new Date().toISOString()}`);
+
+          return res.status(200).json({
+            deposits: formattedDeposits,
+            total: formattedDeposits.length,
+            mode: 'test'
+          });
+        } else {
+          console.warn('⚠️ Failed to fetch from demo API, falling back to empty list');
+          return res.status(200).json({
+            deposits: [],
+            total: 0,
+            mode: 'test'
+          });
+        }
+      } catch (demoError) {
+        console.warn('⚠️ Failed to fetch from demo API:', demoError.message);
+        return res.status(200).json({
+          deposits: [],
+          total: 0,
+          mode: 'test'
+        });
+      }
+    }
+
+    // For live mode, use Stripe API
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY_LIVE);
 
     // Fetch payment intents from Stripe
     const paymentIntents = await stripe.paymentIntents.list({
@@ -71,22 +116,23 @@ async function handleGetDeposits(req, res) {
 
       return {
         id: pi.id,
+        customer: pi.customer || 'Unknown',
         amount: pi.amount,
         currency: pi.currency,
         status: mapStripeStatus(pi.status, amountRefunded, amountReceived),
-        customerId: pi.customer || 'Unknown',
-        created_at: new Date(pi.created * 1000).toISOString(),
+        created: pi.created,
         capturedAmount: amountReceived,
         refundedAmount: amountRefunded,
         metadata: pi.metadata || {}
       };
     });
 
+    console.log(`✅ Successfully fetched ${deposits.length} deposits from live mode at ${new Date().toISOString()}`);
+
     return res.status(200).json({
-      success: true,
       deposits,
-      mode,
-      count: deposits.length
+      total: deposits.length,
+      mode: 'live'
     });
 
   } catch (error) {
