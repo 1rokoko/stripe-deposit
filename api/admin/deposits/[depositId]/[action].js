@@ -73,18 +73,22 @@ async function handleDepositAction(req, res, depositId, action) {
           expand: ['charges']
         });
 
-        if (!paymentIntent.charges?.data?.[0]) {
-          return res.status(400).json({
-            error: 'No charge found for this payment intent'
+        let refundResult;
+
+        if (paymentIntent.charges?.data?.[0]) {
+          // Method 1: Refund via Charge (preferred for newer payment intents)
+          const charge = paymentIntent.charges.data[0];
+          refundResult = await stripe.refunds.create({
+            charge: charge.id,
+            amount: amount
+          });
+        } else {
+          // Method 2: Refund via Payment Intent (for older payment intents without charges)
+          refundResult = await stripe.refunds.create({
+            payment_intent: paymentIntent.id,
+            amount: amount
           });
         }
-
-        const charge = paymentIntent.charges.data[0];
-        
-        const refundResult = await stripe.refunds.create({
-          charge: charge.id,
-          amount: amount
-        });
 
         return res.status(200).json({
           success: true,
