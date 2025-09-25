@@ -16,6 +16,7 @@ export default function AdminDashboard() {
   const [hasLiveKeys, setHasLiveKeys] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
   const [partialCaptureModal, setPartialCaptureModal] = useState({ show: false, deposit: null, amount: '' });
+  const [partialRefundModal, setPartialRefundModal] = useState({ show: false, deposit: null, amount: '' });
   const router = useRouter();
 
   useEffect(() => {
@@ -143,6 +144,7 @@ export default function AdminDashboard() {
         await fetchDeposits();
         setError(''); // Clear any previous errors
         setPartialCaptureModal({ show: false, deposit: null, amount: '' });
+        setPartialRefundModal({ show: false, deposit: null, amount: '' });
       } else {
         const data = await response.json();
         setError(data.error || `Failed to ${action} deposit`);
@@ -169,6 +171,28 @@ export default function AdminDashboard() {
       handleDepositAction(partialCaptureModal.deposit.id, 'capture', amount);
     } else {
       setError('Invalid amount for partial capture');
+    }
+  };
+
+  const handlePartialRefund = (deposit) => {
+    const maxRefundAmount = (deposit.capturedAmount || deposit.amount) / 100;
+    const alreadyRefunded = (deposit.refundedAmount || 0) / 100;
+    const availableForRefund = maxRefundAmount - alreadyRefunded;
+
+    setPartialRefundModal({
+      show: true,
+      deposit,
+      amount: availableForRefund.toString(),
+      maxAmount: availableForRefund
+    });
+  };
+
+  const executePartialRefund = () => {
+    const amount = parseFloat(partialRefundModal.amount);
+    if (amount > 0 && amount <= partialRefundModal.maxAmount) {
+      handleDepositAction(partialRefundModal.deposit.id, 'refund', amount);
+    } else {
+      setError('Invalid amount for partial refund');
     }
   };
 
@@ -433,10 +457,43 @@ export default function AdminDashboard() {
                           </>
                         )}
                         {deposit.status === 'captured' && (
-                          <span className="text-green-600">✅ Captured</span>
+                          <>
+                            <button
+                              onClick={() => handleDepositAction(deposit.id, 'refund')}
+                              disabled={actionLoading[`${deposit.id}-refund`]}
+                              className={`${
+                                actionLoading[`${deposit.id}-refund`]
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-red-600 hover:text-red-900'
+                              } transition-colors mr-2`}
+                            >
+                              {actionLoading[`${deposit.id}-refund`] ? '⏳' : '💸'} Full Refund
+                            </button>
+                            <button
+                              onClick={() => handlePartialRefund(deposit)}
+                              className="text-orange-600 hover:text-orange-900 transition-colors mr-2"
+                            >
+                              🔄 Partial Refund
+                            </button>
+                            <span className="text-green-600">✅ Captured</span>
+                          </>
                         )}
                         {deposit.status === 'released' && (
                           <span className="text-gray-600">🔓 Released</span>
+                        )}
+                        {deposit.status === 'refunded' && (
+                          <span className="text-red-600">💸 Refunded</span>
+                        )}
+                        {deposit.status === 'partially_refunded' && (
+                          <>
+                            <button
+                              onClick={() => handlePartialRefund(deposit)}
+                              className="text-orange-600 hover:text-orange-900 transition-colors mr-2"
+                            >
+                              🔄 Refund More
+                            </button>
+                            <span className="text-orange-600">🔄 Partially Refunded</span>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -487,6 +544,58 @@ export default function AdminDashboard() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                 >
                   Capture ${partialCaptureModal.amount || '0.00'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Refund Modal */}
+      {partialRefundModal.show && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Partial Refund - {partialRefundModal.deposit?.id}
+              </h3>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  Available for refund: ${partialRefundModal.maxAmount?.toFixed(2) || '0.00'}
+                </p>
+                <p className="text-xs text-gray-500 mb-2">
+                  Captured: ${((partialRefundModal.deposit?.capturedAmount || partialRefundModal.deposit?.amount) / 100).toFixed(2)}
+                  {partialRefundModal.deposit?.refundedAmount &&
+                    ` | Already refunded: $${(partialRefundModal.deposit.refundedAmount / 100).toFixed(2)}`
+                  }
+                </p>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount to refund:
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={partialRefundModal.maxAmount}
+                  value={partialRefundModal.amount}
+                  onChange={(e) => setPartialRefundModal(prev => ({ ...prev, amount: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setPartialRefundModal({ show: false, deposit: null, amount: '', maxAmount: 0 })}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executePartialRefund}
+                  disabled={!partialRefundModal.amount || parseFloat(partialRefundModal.amount) <= 0}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+                >
+                  Refund ${partialRefundModal.amount || '0.00'}
                 </button>
               </div>
             </div>

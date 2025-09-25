@@ -63,6 +63,7 @@ export default async function handler(req, res) {
           'GET /demo/deposits/{id}': 'Get deposit details',
           'POST /demo/deposits/{id}/capture': 'Capture deposit',
           'POST /demo/deposits/{id}/release': 'Release deposit',
+          'POST /demo/deposits/{id}/refund': 'Refund captured deposit',
         },
         note: 'This is a demo version. Real Stripe integration requires proper API keys.'
       });
@@ -297,6 +298,52 @@ export default async function handler(req, res) {
               note: 'This is a demo. No real payment was processed.'
             });
 
+          case 'refund':
+            if (deposit.status !== 'captured') {
+              return res.status(400).json({
+                error: 'Deposit must be captured to refund',
+                currentStatus: deposit.status
+              });
+            }
+
+            const refundAmount = req.body?.amount || deposit.capturedAmount || deposit.holdAmount;
+            const maxRefundAmount = deposit.capturedAmount || deposit.holdAmount;
+
+            if (refundAmount > maxRefundAmount) {
+              return res.status(400).json({
+                error: 'Refund amount cannot exceed captured amount',
+                maxRefundAmount: maxRefundAmount / 100,
+                requestedAmount: refundAmount / 100
+              });
+            }
+
+            updatedDeposit = await repository.update(depositId, (current) => ({
+              ...current,
+              status: refundAmount >= maxRefundAmount ? 'refunded' : 'partially_refunded',
+              refundedAmount: (current.refundedAmount || 0) + refundAmount,
+              refundedAt: now.toISOString(),
+              refundHistory: [
+                ...(current.refundHistory || []),
+                {
+                  amount: refundAmount,
+                  refundedAt: now.toISOString(),
+                  refundId: `re_demo_${Date.now()}`
+                }
+              ]
+            }));
+
+            return res.status(200).json({
+              success: true,
+              action: 'refund',
+              depositId,
+              message: `Demo deposit ${refundAmount >= maxRefundAmount ? 'fully' : 'partially'} refunded successfully`,
+              refundedAmount: refundAmount,
+              totalRefunded: updatedDeposit.refundedAmount,
+              remainingAmount: maxRefundAmount - updatedDeposit.refundedAmount,
+              timestamp: now.toISOString(),
+              note: 'This is a demo. No real refund was processed.'
+            });
+
           case 'reauthorize':
             updatedDeposit = await repository.update(depositId, (current) => ({
               ...current,
@@ -315,7 +362,7 @@ export default async function handler(req, res) {
           default:
             return res.status(404).json({
               error: 'Action not found',
-              availableActions: ['capture', 'release', 'reauthorize']
+              availableActions: ['capture', 'release', 'refund', 'reauthorize']
             });
         }
       } catch (error) {
