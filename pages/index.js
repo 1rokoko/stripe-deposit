@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import DepositForm from '../components/DepositForm';
+import StripeCardForm from '../components/StripeCardForm';
 import DepositStatus from '../components/DepositStatus';
 
 export async function getServerSideProps() {
@@ -114,6 +115,77 @@ export default function Home() {
       setAlert({
         type: 'error',
         message: error.message || 'Failed to create deposit',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSecureDepositSubmit = async (formData) => {
+    setLoading(true);
+    setAlert(null);
+
+    try {
+      console.log(`🔄 Creating secure deposit in ${mode} mode...`);
+
+      let response, result;
+
+      if (mode === 'test') {
+        // Use demo API for test mode
+        const amount = Math.round(parseFloat(formData.amount) || 100);
+        response = await fetch(`/api/demo/deposits/hold/${amount}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            customerId: `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            metadata: {
+              demo: true,
+              secure: true,
+              requestedAmount: formData.amount,
+            },
+          }),
+        });
+      } else {
+        // Use secure API for live mode
+        response = await fetch('/api/deposits/create-secure', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-stripe-mode': mode
+          },
+          body: JSON.stringify({
+            amount: formData.amount,
+            paymentMethodId: formData.paymentMethodId,
+            metadata: {
+              created_via: 'secure_main_page'
+            }
+          }),
+        });
+      }
+
+      result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || result.details || 'Failed to create secure deposit');
+      }
+
+      setAlert({
+        type: 'success',
+        message: `Secure deposit created successfully! ID: ${result.deposit.id}`,
+      });
+
+      // Refresh deposits list
+      fetchDeposits();
+
+      console.log(`✅ Secure deposit created successfully in ${mode} mode: ${result.deposit.id}`);
+
+    } catch (error) {
+      console.error(`❌ Error creating secure deposit in ${mode} mode:`, error);
+      setAlert({
+        type: 'error',
+        message: error.message || 'Failed to create secure deposit',
       });
     } finally {
       setLoading(false);
@@ -238,11 +310,43 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Deposit Form */}
             <div>
-              <DepositForm
-                onSubmit={handleDepositSubmit}
-                loading={loading}
-                mode={mode}
-              />
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Deposit</h2>
+
+                {mode === 'live' && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h3 className="text-lg font-semibold text-red-800 mb-2">⚠️ LIVE MODE WARNING</h3>
+                    <p className="text-red-700">
+                      You are in LIVE mode. Real charges will be made to your card.
+                      Only use real card information that you own.
+                    </p>
+                  </div>
+                )}
+
+                {mode === 'live' ? (
+                  <StripeCardForm
+                    onSubmit={handleSecureDepositSubmit}
+                    loading={loading}
+                    mode={mode}
+                  />
+                ) : (
+                  <DepositForm
+                    onSubmit={handleDepositSubmit}
+                    loading={loading}
+                    mode={mode}
+                  />
+                )}
+
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">💡 How Deposits Work</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Deposits are held securely and not charged immediately</li>
+                    <li>• You can capture (charge) or release (cancel) deposits later</li>
+                    <li>• All transactions are processed through Stripe's secure platform</li>
+                    <li>• {mode === 'test' ? 'Test mode uses demo data - no real charges are made' : 'Live mode processes real transactions with your card'}</li>
+                  </ul>
+                </div>
+              </div>
             </div>
 
             {/* Deposit Status */}
