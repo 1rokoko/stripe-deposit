@@ -258,10 +258,14 @@ export default async function handler(req, res) {
               });
             }
 
+            // Ensure capturedAmount is properly set (amount comes in cents from admin API)
+            const captureAmount = req.body?.amount || deposit.holdAmount;
+            console.log(`🔍 Demo capture: requested=${req.body?.amount}, holdAmount=${deposit.holdAmount}, using=${captureAmount}`);
+
             updatedDeposit = await repository.update(depositId, (current) => ({
               ...current,
               status: 'captured',
-              capturedAmount: req.body?.amount || current.holdAmount,
+              capturedAmount: captureAmount,
               capturedAt: now.toISOString()
             }));
 
@@ -306,13 +310,27 @@ export default async function handler(req, res) {
               });
             }
 
-            const refundAmount = req.body?.amount || deposit.capturedAmount || deposit.holdAmount;
+            // Amount comes in cents from admin API
+            const refundAmount = req.body?.amount;
             const maxRefundAmount = deposit.capturedAmount || deposit.holdAmount;
+            const alreadyRefunded = deposit.refundedAmount || 0;
+            const availableForRefund = maxRefundAmount - alreadyRefunded;
 
-            if (refundAmount > maxRefundAmount) {
+            console.log(`🔍 Demo refund: requested=${refundAmount}, maxRefund=${maxRefundAmount}, alreadyRefunded=${alreadyRefunded}, available=${availableForRefund}`);
+
+            if (!refundAmount || refundAmount <= 0) {
               return res.status(400).json({
-                error: 'Refund amount cannot exceed captured amount',
+                error: 'Refund amount must be specified and greater than 0',
+                availableForRefund: availableForRefund / 100
+              });
+            }
+
+            if (refundAmount > availableForRefund) {
+              return res.status(400).json({
+                error: 'Refund amount cannot exceed available amount',
                 maxRefundAmount: maxRefundAmount / 100,
+                alreadyRefunded: alreadyRefunded / 100,
+                availableForRefund: availableForRefund / 100,
                 requestedAmount: refundAmount / 100
               });
             }
