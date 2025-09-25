@@ -7,7 +7,6 @@ import { Alert } from './ui/Alert';
 export default function DepositForm({ onSubmit, loading = false, mode = 'test' }) {
   const [formData, setFormData] = useState({
     amount: '',
-    customerId: '',
     cardNumber: '',
     expMonth: '',
     expYear: '',
@@ -28,12 +27,7 @@ export default function DepositForm({ onSubmit, loading = false, mode = 'test' }
       newErrors.amount = 'Maximum amount is $10,000.00';
     }
 
-    // Customer ID validation
-    if (!formData.customerId) {
-      newErrors.customerId = 'Customer ID is required';
-    } else if (formData.customerId.length < 3) {
-      newErrors.customerId = 'Customer ID must be at least 3 characters';
-    }
+
 
     // Card number validation
     if (!formData.cardNumber) {
@@ -86,7 +80,6 @@ export default function DepositForm({ onSubmit, loading = false, mode = 'test' }
       // Reset form on success
       setFormData({
         amount: '',
-        customerId: '',
         cardNumber: '',
         expMonth: '',
         expYear: '',
@@ -186,31 +179,19 @@ export default function DepositForm({ onSubmit, loading = false, mode = 'test' }
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Deposit Amount"
-            type="number"
-            step="0.01"
-            min="1"
-            max="10000"
-            value={formData.amount}
-            onChange={(e) => handleInputChange('amount', e.target.value)}
-            error={errors.amount}
-            placeholder="100.00"
-            required
-            helperText="Minimum: $1.00, Maximum: $10,000.00"
-          />
-
-          <Input
-            label="Customer ID"
-            value={formData.customerId}
-            onChange={(e) => handleInputChange('customerId', e.target.value)}
-            error={errors.customerId}
-            placeholder="customer_123"
-            required
-            helperText="Unique identifier for the customer"
-          />
-        </div>
+        <Input
+          label="Deposit Amount"
+          type="number"
+          step="0.01"
+          min="1"
+          max="10000"
+          value={formData.amount}
+          onChange={(e) => handleInputChange('amount', e.target.value)}
+          error={errors.amount}
+          placeholder="100.00"
+          required
+          helperText="Minimum: $1.00, Maximum: $10,000.00"
+        />
 
         <Input
           label="Card Number"

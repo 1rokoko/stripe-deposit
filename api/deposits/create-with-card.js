@@ -47,9 +47,17 @@ export default async function handler(req, res) {
         : process.env.STRIPE_SECRET_KEY
     );
 
-    console.log(`🔄 Creating deposit in ${mode} mode for $${amount}`);
+    console.log(`🔄 Creating deposit in ${mode} mode for $${amount}`, {
+      mode,
+      amount,
+      customerId,
+      cardNumberLast4: cardNumber.slice(-4),
+      expMonth,
+      expYear
+    });
 
     // Create payment method with card details
+    console.log('🔄 Creating payment method...');
     const paymentMethod = await stripe.paymentMethods.create({
       type: 'card',
       card: {
@@ -60,20 +68,28 @@ export default async function handler(req, res) {
       }
     });
 
-    console.log(`✅ Payment method created: ${paymentMethod.id}`);
+    console.log(`✅ Payment method created: ${paymentMethod.id}`, {
+      paymentMethodId: paymentMethod.id,
+      cardBrand: paymentMethod.card?.brand,
+      cardLast4: paymentMethod.card?.last4,
+      cardCountry: paymentMethod.card?.country
+    });
 
     // Create or retrieve customer
     let customer;
     try {
       // Try to retrieve existing customer
       customer = await stripe.customers.retrieve(customerId);
+      console.log(`✅ Found existing customer: ${customer.id}`);
     } catch (error) {
       // Customer doesn't exist, create new one
+      console.log(`🔄 Creating new customer: ${customerId}`);
       customer = await stripe.customers.create({
         id: customerId,
         metadata: {
           created_via: 'deposit_api',
-          mode: mode
+          mode: mode,
+          created_at: new Date().toISOString()
         }
       });
       console.log(`✅ Customer created: ${customer.id}`);
@@ -114,35 +130,64 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('❌ Error creating deposit:', error);
-    
-    // Handle specific Stripe errors
+    console.error('❌ Error creating deposit:', {
+      error: error.message,
+      type: error.type,
+      code: error.code,
+      param: error.param,
+      decline_code: error.decline_code,
+      mode: mode,
+      stack: error.stack
+    });
+
+    // Handle specific Stripe errors with more detailed information
     if (error.type === 'StripeCardError') {
       return res.status(400).json({
         error: 'Card was declined',
         details: error.message,
         code: error.code,
-        decline_code: error.decline_code
+        decline_code: error.decline_code,
+        param: error.param
       });
     }
-    
+
     if (error.type === 'StripeInvalidRequestError') {
       return res.status(400).json({
         error: 'Invalid card information',
-        details: error.message
+        details: error.message,
+        code: error.code,
+        param: error.param,
+        stripe_error_type: error.type
       });
     }
 
     if (error.type === 'StripeAuthenticationError') {
       return res.status(401).json({
         error: 'Authentication failed',
-        details: 'Invalid Stripe API key'
+        details: 'Invalid Stripe API key for ' + mode + ' mode',
+        mode: mode
+      });
+    }
+
+    if (error.type === 'StripeRateLimitError') {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        details: error.message
+      });
+    }
+
+    if (error.type === 'StripeConnectionError') {
+      return res.status(502).json({
+        error: 'Connection error',
+        details: 'Unable to connect to Stripe'
       });
     }
 
     return res.status(500).json({
       error: 'Failed to create deposit',
-      details: error.message
+      details: error.message,
+      type: error.type,
+      mode: mode
     });
   }
 }

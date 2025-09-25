@@ -48,6 +48,9 @@ export default function Home() {
     try {
       console.log(`🔄 Creating deposit in ${mode} mode...`);
 
+      // Generate automatic customer ID
+      const customerId = `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       let response, result;
 
       if (mode === 'test') {
@@ -59,7 +62,7 @@ export default function Home() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            customerId: formData.customerId,
+            customerId: customerId,
             metadata: {
               demo: true,
               cardNumber: formData.cardNumber.slice(-4),
@@ -77,7 +80,7 @@ export default function Home() {
           },
           body: JSON.stringify({
             amount: formData.amount,
-            customerId: formData.customerId,
+            customerId: customerId,
             cardNumber: formData.cardNumber,
             expMonth: formData.expMonth,
             expYear: formData.expYear,
