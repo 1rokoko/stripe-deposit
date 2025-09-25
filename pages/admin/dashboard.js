@@ -45,7 +45,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchDeposits = async (forceRefresh = false) => {
+  const fetchDeposits = async (forceRefresh = false, overrideMode = null) => {
     try {
       setLoading(true);
       setError('');
@@ -56,9 +56,10 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Use proper admin API based on current mode
+      // Use override mode if provided, otherwise fall back to current state
+      const currentMode = overrideMode || mode;
       const timestamp = new Date().toISOString();
-      console.log(`🔄 Fetching deposits from ${mode} mode...`, forceRefresh ? '(FORCE REFRESH)' : '', timestamp);
+      console.log(`🔄 Fetching deposits from ${currentMode} mode...`, forceRefresh ? '(FORCE REFRESH)' : '', timestamp);
 
       // Add cache busting parameter for force refresh
       const url = forceRefresh ? `/api/admin/deposits?_t=${Date.now()}` : '/api/admin/deposits';
@@ -66,18 +67,18 @@ export default function AdminDashboard() {
         headers: {
           'Authorization': `Bearer ${adminToken}`,
           'Content-Type': 'application/json',
-          'X-Stripe-Mode': mode
+          'X-Stripe-Mode': currentMode
         }
       });
 
       if (response.ok) {
         const data = await response.json();
         setDeposits(data.deposits || []);
-        console.log(`✅ Successfully fetched ${data.deposits?.length || 0} deposits from ${mode} mode at`, new Date().toISOString());
+        console.log(`✅ Successfully fetched ${data.deposits?.length || 0} deposits from ${currentMode} mode at`, new Date().toISOString());
       } else {
         console.error(`❌ Admin API failed:`, response.status);
         const errorData = await response.json().catch(() => ({}));
-        setError(errorData.error || `Failed to fetch deposits from ${mode} mode`);
+        setError(errorData.error || `Failed to fetch deposits from ${currentMode} mode`);
       }
     } catch (err) {
       console.error('❌ Error fetching deposits:', err);
@@ -125,8 +126,8 @@ export default function AdminDashboard() {
 
       if (response.ok) {
         setMode(newMode);
-        // Refresh deposits for the new mode
-        await fetchDeposits();
+        // Refresh deposits for the new mode - pass newMode directly to avoid race condition
+        await fetchDeposits(false, newMode);
       } else {
         const data = await response.json();
         setError(data.error || `Failed to switch to ${newMode} mode`);
