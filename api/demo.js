@@ -318,6 +318,7 @@ export default async function handler(req, res) {
             const availableForRefund = maxRefundAmount - alreadyRefunded;
 
             console.log(`🔍 Demo refund: requestedDollars=${refundAmountInDollars}, requestedCents=${refundAmount}, maxRefund=${maxRefundAmount}, alreadyRefunded=${alreadyRefunded}, available=${availableForRefund}`);
+            console.log(`🔍 Demo refund validation: ${refundAmount} > ${availableForRefund} = ${refundAmount > availableForRefund}`);
 
             if (!refundAmountInDollars || refundAmountInDollars <= 0) {
               return res.status(400).json({
