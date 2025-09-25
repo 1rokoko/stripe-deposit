@@ -44,18 +44,43 @@ async function handleGetDeposits(req, res) {
       expand: ['data.charges']
     });
 
+    // Map Stripe statuses to our internal statuses
+    const mapStripeStatus = (stripeStatus, amountRefunded, amountReceived) => {
+      if (amountRefunded > 0) {
+        return amountRefunded >= amountReceived ? 'refunded' : 'partially_refunded';
+      }
+
+      switch (stripeStatus) {
+        case 'succeeded':
+          return 'captured';
+        case 'requires_capture':
+          return 'pending';
+        case 'canceled':
+          return 'released';
+        case 'requires_payment_method':
+          return 'failed';
+        default:
+          return stripeStatus;
+      }
+    };
+
     // Transform Stripe data to our format
-    const deposits = paymentIntents.data.map(pi => ({
-      id: pi.id,
-      amount: pi.amount,
-      currency: pi.currency,
-      status: pi.status,
-      customerId: pi.customer || 'Unknown',
-      created_at: new Date(pi.created * 1000).toISOString(),
-      capturedAmount: pi.amount_received,
-      refundedAmount: pi.charges?.data?.[0]?.amount_refunded || 0,
-      metadata: pi.metadata || {}
-    }));
+    const deposits = paymentIntents.data.map(pi => {
+      const amountRefunded = pi.charges?.data?.[0]?.amount_refunded || 0;
+      const amountReceived = pi.amount_received || 0;
+
+      return {
+        id: pi.id,
+        amount: pi.amount,
+        currency: pi.currency,
+        status: mapStripeStatus(pi.status, amountRefunded, amountReceived),
+        customerId: pi.customer || 'Unknown',
+        created_at: new Date(pi.created * 1000).toISOString(),
+        capturedAmount: amountReceived,
+        refundedAmount: amountRefunded,
+        metadata: pi.metadata || {}
+      };
+    });
 
     return res.status(200).json({
       success: true,
