@@ -72,7 +72,7 @@ export default function Home() {
         });
       } else {
         // Use live API for live mode
-        response = await fetch('/api/deposits/create-with-card', {
+        response = await fetch('/api/deposits/create-live', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
