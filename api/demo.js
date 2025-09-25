@@ -310,15 +310,16 @@ export default async function handler(req, res) {
               });
             }
 
-            // Amount comes in cents from admin API
-            const refundAmount = req.body?.amount;
+            // Amount comes in dollars from admin API, convert to cents
+            const refundAmountInDollars = req.body?.amount;
+            const refundAmount = refundAmountInDollars ? Math.round(refundAmountInDollars * 100) : 0;
             const maxRefundAmount = deposit.capturedAmount || deposit.holdAmount;
             const alreadyRefunded = deposit.refundedAmount || 0;
             const availableForRefund = maxRefundAmount - alreadyRefunded;
 
-            console.log(`🔍 Demo refund: requested=${refundAmount}, maxRefund=${maxRefundAmount}, alreadyRefunded=${alreadyRefunded}, available=${availableForRefund}`);
+            console.log(`🔍 Demo refund: requestedDollars=${refundAmountInDollars}, requestedCents=${refundAmount}, maxRefund=${maxRefundAmount}, alreadyRefunded=${alreadyRefunded}, available=${availableForRefund}`);
 
-            if (!refundAmount || refundAmount <= 0) {
+            if (!refundAmountInDollars || refundAmountInDollars <= 0) {
               return res.status(400).json({
                 error: 'Refund amount must be specified and greater than 0',
                 availableForRefund: availableForRefund / 100
@@ -331,7 +332,7 @@ export default async function handler(req, res) {
                 maxRefundAmount: maxRefundAmount / 100,
                 alreadyRefunded: alreadyRefunded / 100,
                 availableForRefund: availableForRefund / 100,
-                requestedAmount: refundAmount / 100
+                requestedAmount: refundAmountInDollars
               });
             }
 
