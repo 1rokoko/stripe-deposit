@@ -19,43 +19,18 @@ export default function Home() {
 
   const fetchDemoDeposits = async () => {
     try {
-      // Try to fetch from demo API first
-      const demoResponse = await fetch('/api/demo/deposits');
-      if (demoResponse.ok) {
-        const demoData = await demoResponse.json();
-        setDeposits(demoData.deposits || []);
-        return;
-      }
-
-      // Fallback to admin API if demo API fails
-      try {
-        const loginResponse = await fetch('/api/admin/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: 'admin@stripe-deposit.com',
-            password: 'admin123'
-          })
-        });
-
-        if (loginResponse.ok) {
-          const loginData = await loginResponse.json();
-          const token = loginData.token;
-
-          const response = await fetch('/api/admin/deposits', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            setDeposits(data.deposits || []);
-          }
-        }
-      } catch (adminError) {
-        console.error('Error fetching from admin API:', adminError);
+      // Fetch from demo API only
+      const response = await fetch('/api/demo/deposits');
+      if (response.ok) {
+        const data = await response.json();
+        setDeposits(data.deposits || []);
+      } else {
+        console.error('Failed to fetch deposits from demo API');
+        setDeposits([]);
       }
     } catch (error) {
       console.error('Error fetching deposits:', error);
+      setDeposits([]);
     }
   };
 
@@ -66,35 +41,14 @@ export default function Home() {
     try {
       // Use the amount from the form, default to 100 if not specified
       const amount = Math.round(parseFloat(formData.amount) || 100);
-      const validAmounts = [100, 200];
-      const holdAmount = validAmounts.includes(amount) ? amount : 100;
 
-      // Get admin token first
-      const loginResponse = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'admin@stripe-deposit.com',
-          password: 'admin123'
-        })
-      });
-
-      if (!loginResponse.ok) {
-        throw new Error('Failed to authenticate');
-      }
-
-      const loginData = await loginResponse.json();
-      const token = loginData.token;
-
-      // Create deposit using admin API
-      const response = await fetch('/api/admin/deposits', {
+      // Use demo API for creating deposits
+      const response = await fetch(`/api/demo/deposits/hold/${amount}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          amount: holdAmount,
           customerId: formData.customerId,
           metadata: {
             demo: true,
@@ -130,28 +84,11 @@ export default function Home() {
 
   const handleDepositAction = async (depositId, action) => {
     try {
-      // Get admin token first
-      const loginResponse = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'admin@stripe-deposit.com',
-          password: 'admin123'
-        })
-      });
-
-      if (!loginResponse.ok) {
-        throw new Error('Failed to authenticate');
-      }
-
-      const loginData = await loginResponse.json();
-      const token = loginData.token;
-
-      const response = await fetch(`/api/admin/deposits/${depositId}/${action}`, {
+      // Use demo API for deposit actions
+      const response = await fetch(`/api/demo/deposits/${depositId}/${action}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
       });
 
@@ -167,8 +104,8 @@ export default function Home() {
       });
 
       // Refresh deposits list
-      // In a real app, you'd update the specific deposit in the state
-      
+      fetchDemoDeposits();
+
     } catch (error) {
       setAlert({
         type: 'error',
