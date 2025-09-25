@@ -177,7 +177,7 @@ export default function AdminDashboard() {
   const handlePartialRefund = (deposit) => {
     const maxRefundAmount = (deposit.capturedAmount || deposit.amount) / 100;
     const alreadyRefunded = (deposit.refundedAmount || 0) / 100;
-    const availableForRefund = maxRefundAmount - alreadyRefunded;
+    const availableForRefund = Math.max(0, maxRefundAmount - alreadyRefunded);
 
     setPartialRefundModal({
       show: true,

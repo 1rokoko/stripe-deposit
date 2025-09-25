@@ -299,9 +299,9 @@ export default async function handler(req, res) {
             });
 
           case 'refund':
-            if (deposit.status !== 'captured') {
+            if (deposit.status !== 'captured' && deposit.status !== 'partially_refunded') {
               return res.status(400).json({
-                error: 'Deposit must be captured to refund',
+                error: 'Deposit must be captured or partially refunded to refund',
                 currentStatus: deposit.status
               });
             }
