@@ -15,6 +15,15 @@ export default async function handler(req, res) {
   }
 
   try {
+    // First, log the raw request
+    console.log('🔍 Raw API Request:', {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      bodyType: typeof req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : 'no body'
+    });
+
     const {
       amount,
       customerId,
@@ -27,9 +36,12 @@ export default async function handler(req, res) {
     // Debug logging
     console.log('🔍 API Request received:', {
       amount,
+      amountType: typeof amount,
       currency,
       customerId,
+      customerIdType: typeof customerId,
       paymentMethodId: paymentMethodId ? 'present' : 'missing',
+      paymentMethodIdType: typeof paymentMethodId,
       metadata,
       mode: req.headers['x-stripe-mode'] || 'test',
       body: req.body
