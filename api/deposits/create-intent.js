@@ -182,6 +182,35 @@ export default async function handler(req, res) {
 
     if (!stripeKey) {
       console.error('❌ Stripe key not found:', { mode, testKeyExists: !!testKey, liveKeyExists: !!liveKey });
+
+      // In test mode, create a mock response for demonstration
+      if (mode === 'test') {
+        console.log('🎭 Creating mock payment intent for demo purposes');
+
+        const mockPaymentIntent = {
+          id: `pi_mock_${Date.now()}`,
+          amount: amountInCents,
+          currency: normalizedCurrency,
+          status: 'requires_capture',
+          client_secret: `pi_mock_${Date.now()}_secret_mock`,
+          created: Math.floor(Date.now() / 1000),
+          metadata: {
+            customerId,
+            created_via: 'mock_demo',
+            mode: 'test'
+          }
+        };
+
+        console.log('✅ Mock payment intent created:', mockPaymentIntent);
+
+        return res.status(200).json({
+          success: true,
+          paymentIntent: mockPaymentIntent,
+          mode: 'test',
+          note: 'This is a mock payment intent for demonstration purposes. No real charge was created.'
+        });
+      }
+
       return res.status(500).json({
         error: `Stripe ${mode} key not configured`,
         mode: mode
