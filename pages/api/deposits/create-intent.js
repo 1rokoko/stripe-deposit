@@ -34,8 +34,8 @@ export default async function handler(req, res) {
     // Determine mode and get appropriate Stripe key
     const mode = req.headers['x-stripe-mode'] || 'test';
     const testKey = process.env.STRIPE_SECRET_KEY;
-    const liveKey = process.env.STRIPE_SECRET_KEY_LIVE;
-    
+    const liveKey = process.env.STRIPE_SECRET_KEY_LIVE || process.env.STRIPE_SECRET_KEY; // Fallback to test key for demo
+
     const stripeKey = mode === 'live' ? liveKey : testKey;
     
     console.log('🔑 Stripe key configuration:', {
