@@ -102,18 +102,51 @@ export default async function handler(req, res) {
       currency: normalizedCurrency
     });
     
+    // Create or get customer in Stripe
+    let stripeCustomer;
+    try {
+      // Check if customerId looks like a real Stripe customer ID
+      if (customerId.startsWith('cus_')) {
+        // Try to retrieve existing customer
+        stripeCustomer = await stripe.customers.retrieve(customerId);
+        console.log('✅ Retrieved existing customer:', stripeCustomer.id);
+      } else {
+        // Create new customer in Stripe
+        stripeCustomer = await stripe.customers.create({
+          metadata: {
+            original_id: customerId,
+            created_via: 'api',
+            mode
+          }
+        });
+        console.log('✅ Created new customer:', stripeCustomer.id);
+      }
+    } catch (customerError) {
+      console.log('🔄 Customer not found or invalid, creating new customer:', customerError.message);
+      // Create new customer if retrieval fails
+      stripeCustomer = await stripe.customers.create({
+        metadata: {
+          original_id: customerId,
+          created_via: 'api',
+          mode
+        }
+      });
+      console.log('✅ Created new customer after error:', stripeCustomer.id);
+    }
+
     // Create payment intent
     const paymentIntentParams = {
       amount: amountInCents,
       currency: normalizedCurrency,
       payment_method: paymentMethodId,
-      customer: customerId,
+      customer: stripeCustomer.id, // Use real Stripe customer ID
       capture_method: 'manual', // Hold the payment for later capture
       confirmation_method: 'manual',
       confirm: true,
       return_url: `${req.headers.origin || 'https://stripe-deposit.vercel.app'}/deposit-status`,
       metadata: {
-        customerId,
+        customerId: stripeCustomer.id,
+        original_customer_id: customerId,
         created_via: 'api',
         mode
       }

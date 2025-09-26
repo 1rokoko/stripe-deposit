@@ -170,7 +170,7 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       const requestBody = {
         amount: amountValue,
         currency: currency,
-        customerId: `customer_${Date.now()}`, // Generate unique customer ID
+        customerId: `temp_customer_${Date.now()}`, // Temporary ID, API will create real Stripe customer
         paymentMethodId: paymentMethod.id,
         metadata: {
           created_via: 'stripe_card_form',
