@@ -59,50 +59,11 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
           setCardBrand(event.brand);
         }
 
-        // Extract card number for currency detection
-        // Note: Stripe Elements doesn't expose the full card number for security,
-        // but we can use the brand and other info for basic detection
+        // Note: Stripe Elements doesn't expose the full card number for security reasons
+        // Currency detection will be handled by the separate CardNumberInput component
+        // which captures the real card number for BIN detection
         if (event.complete && event.brand) {
           console.log('Card event:', event);
-
-          // Since we can't get the real card number from Stripe Elements,
-          // we'll use a more sophisticated approach based on user location
-          // and common card patterns for different regions
-          let mockCardNumber = '';
-
-          // Try to detect based on user's location and common patterns
-          const userLocale = navigator.language || 'en-US';
-          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-          console.log('User locale:', userLocale, 'timezone:', userTimezone);
-
-          // Thailand detection
-          if (userTimezone.includes('Bangkok') || userLocale.includes('th')) {
-            mockCardNumber = '4340765004665567'; // Thai Visa card
-          }
-          // Singapore detection
-          else if (userTimezone.includes('Singapore') || userLocale.includes('sg')) {
-            mockCardNumber = '5406160000000000'; // Singapore card
-          }
-          // Europe detection
-          else if (userTimezone.includes('Europe') || userLocale.includes('de') || userLocale.includes('fr') || userLocale.includes('es')) {
-            mockCardNumber = '4000000000000002'; // EUR card (we'll map this to EUR)
-          }
-          // Default to USD for other regions
-          else {
-            switch (event.brand) {
-              case 'visa':
-                mockCardNumber = '4000000000000002'; // USD Visa
-                break;
-              case 'mastercard':
-                mockCardNumber = '5555555555554444'; // USD Mastercard
-                break;
-              default:
-                mockCardNumber = '4000000000000002';
-            }
-          }
-
-          setDetectedCardNumber(mockCardNumber);
         }
       });
 
@@ -142,9 +103,36 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
     setProcessing(true);
     setAuthenticationStep('Validating amount...');
 
+    // Debug logging for amount
+    console.log('🔍 Amount validation debug:', {
+      amount,
+      amountType: typeof amount,
+      amountLength: amount ? amount.length : 'null/undefined',
+      currency,
+      currencyType: typeof currency,
+      realCardNumber,
+      detectedCardNumber
+    });
+
     // Validate amount for selected currency
     const amountValue = parseFloat(amount);
+    console.log('🔍 Parsed amount:', {
+      amountValue,
+      amountValueType: typeof amountValue,
+      isNaN: isNaN(amountValue)
+    });
+
+    // Additional validation - ensure amount is not empty or zero
+    if (!amount || amount.trim() === '' || amountValue <= 0 || isNaN(amountValue)) {
+      setError('Please enter a valid deposit amount');
+      setProcessing(false);
+      setAuthenticationStep('');
+      return;
+    }
+
     const validation = validateAmount(amountValue, currency);
+    console.log('🔍 Amount validation result:', validation);
+
     if (!validation.valid) {
       setError(validation.error);
       setProcessing(false);
@@ -194,7 +182,14 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       console.log('🔄 Sending API request:', {
         url: '/api/deposits/create-intent',
         mode: mode,
-        body: requestBody
+        body: requestBody,
+        bodyStringified: JSON.stringify(requestBody),
+        amountValidation: {
+          originalAmount: amount,
+          parsedAmount: amountValue,
+          isValidNumber: !isNaN(amountValue),
+          isPositive: amountValue > 0
+        }
       });
 
       // Create payment intent on backend

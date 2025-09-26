@@ -21,7 +21,8 @@ export default async function handler(req, res) {
       headers: req.headers,
       body: req.body,
       bodyType: typeof req.body,
-      bodyKeys: req.body ? Object.keys(req.body) : 'no body'
+      bodyKeys: req.body ? Object.keys(req.body) : 'no body',
+      bodyStringified: JSON.stringify(req.body)
     });
 
     const {
@@ -37,21 +38,47 @@ export default async function handler(req, res) {
     console.log('🔍 API Request received:', {
       amount,
       amountType: typeof amount,
+      amountValue: amount,
+      amountEmpty: amount === '' || amount === null || amount === undefined,
       currency,
       customerId,
       customerIdType: typeof customerId,
+      customerIdValue: customerId,
       paymentMethodId: paymentMethodId ? 'present' : 'missing',
       paymentMethodIdType: typeof paymentMethodId,
+      paymentMethodIdValue: paymentMethodId,
       metadata,
       mode: req.headers['x-stripe-mode'] || 'test',
-      body: req.body
+      bodyStringified: JSON.stringify(req.body)
     });
 
-    // Validate required fields
-    if (!amount || !customerId || !paymentMethodId) {
-      console.error('❌ Missing required fields:', { amount, customerId, paymentMethodId });
+    // Enhanced validation with detailed error messages
+    const missingFields = [];
+    if (!amount || amount === '' || amount === null || amount === undefined) {
+      missingFields.push('amount');
+    }
+    if (!customerId || customerId === '' || customerId === null || customerId === undefined) {
+      missingFields.push('customerId');
+    }
+    if (!paymentMethodId || paymentMethodId === '' || paymentMethodId === null || paymentMethodId === undefined) {
+      missingFields.push('paymentMethodId');
+    }
+
+    if (missingFields.length > 0) {
+      console.error('❌ Missing required fields:', {
+        missingFields,
+        amount,
+        customerId,
+        paymentMethodId,
+        receivedBody: req.body
+      });
       return res.status(400).json({
-        error: 'Missing required fields: amount, customerId, paymentMethodId'
+        error: `Missing required fields: ${missingFields.join(', ')}`,
+        details: {
+          amount: amount || 'missing',
+          customerId: customerId || 'missing',
+          paymentMethodId: paymentMethodId || 'missing'
+        }
       });
     }
 
