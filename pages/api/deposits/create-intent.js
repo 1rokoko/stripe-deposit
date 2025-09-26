@@ -36,7 +36,8 @@ export default async function handler(req, res) {
     const testKey = process.env.STRIPE_SECRET_KEY;
     const liveKey = process.env.STRIPE_SECRET_KEY_LIVE || process.env.STRIPE_SECRET_KEY; // Fallback to test key for demo
 
-    const stripeKey = mode === 'live' ? liveKey : testKey;
+    // For demo purposes, always use test key to enable 3D authentication testing
+    const stripeKey = testKey;
     
     console.log('🔑 Stripe key configuration:', {
       mode,
