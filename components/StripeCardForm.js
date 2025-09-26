@@ -150,6 +150,11 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
+        billing_details: {
+          address: {
+            postal_code: '10110' // Default postal code for THB cards
+          }
+        }
       });
 
       if (paymentMethodError) {
