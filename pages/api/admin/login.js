@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     }
 
     // Generate JWT token
-    const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+    const jwtSecret = process.env.JWT_SECRET || 'admin-secret-key';
     const token = jwt.sign(
       {
         id: 'admin',
