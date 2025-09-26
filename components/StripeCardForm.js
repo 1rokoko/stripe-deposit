@@ -123,6 +123,14 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
     setDetectedCardNumber(cardNumber);
   };
 
+  // Expose setAmount function globally for testing
+  useEffect(() => {
+    window.setAmountForTesting = setAmount;
+    return () => {
+      delete window.setAmountForTesting;
+    };
+  }, []);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
