@@ -163,20 +163,40 @@ export default async function handler(req, res) {
 
     // Get mode from headers or default to test
     const mode = req.headers['x-stripe-mode'] || 'test';
-    
+
+    // Check environment variables
+    const testKey = process.env.STRIPE_SECRET_KEY;
+    const liveKey = process.env.STRIPE_SECRET_KEY_LIVE;
+
+    console.log('🔍 Stripe keys check:', {
+      mode,
+      testKeyExists: !!testKey,
+      testKeyPrefix: testKey ? testKey.substring(0, 8) + '...' : 'missing',
+      liveKeyExists: !!liveKey,
+      liveKeyPrefix: liveKey ? liveKey.substring(0, 8) + '...' : 'missing',
+      allEnvKeys: Object.keys(process.env).filter(key => key.includes('STRIPE'))
+    });
+
     // Import Stripe with appropriate key
-    const stripe = require('stripe')(
-      mode === 'live' 
-        ? process.env.STRIPE_SECRET_KEY_LIVE 
-        : process.env.STRIPE_SECRET_KEY
-    );
+    const stripeKey = mode === 'live' ? liveKey : testKey;
+
+    if (!stripeKey) {
+      console.error('❌ Stripe key not found:', { mode, testKeyExists: !!testKey, liveKeyExists: !!liveKey });
+      return res.status(500).json({
+        error: `Stripe ${mode} key not configured`,
+        mode: mode
+      });
+    }
+
+    const stripe = require('stripe')(stripeKey);
 
     console.log(`🔄 Creating payment intent in ${mode} mode for ${currencyConfig.symbol}${amount}`, {
       mode,
       amount,
       currency: normalizedCurrency,
       customerId,
-      paymentMethodId
+      paymentMethodId,
+      stripeKeyPrefix: stripeKey.substring(0, 8) + '...'
     });
 
     // Create or retrieve customer

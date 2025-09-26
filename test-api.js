@@ -12,11 +12,10 @@ const postData = JSON.stringify(testData);
 const options = {
   hostname: 'stripe-deposit.vercel.app',
   port: 443,
-  path: '/api/deposits/create-intent',
+  path: '/api/test-body',
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'x-stripe-mode': 'test',
     'Content-Length': Buffer.byteLength(postData)
   }
 };
