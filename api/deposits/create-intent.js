@@ -23,6 +23,21 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: `Method ${req.method} not allowed` });
   }
 
+  // Debug: Log everything about the request
+  console.log('🔍 FULL REQUEST DEBUG:', {
+    method: req.method,
+    url: req.url,
+    headers: JSON.stringify(req.headers),
+    body: req.body,
+    bodyType: typeof req.body,
+    bodyConstructor: req.body?.constructor?.name,
+    bodyKeys: req.body ? Object.keys(req.body) : null,
+    bodyValues: req.body ? Object.values(req.body) : null,
+    bodyEntries: req.body ? Object.entries(req.body) : null,
+    rawBody: JSON.stringify(req.body),
+    query: req.query
+  });
+
   try {
     // First, log the raw request
     console.log('🔍 Raw API Request:', {
