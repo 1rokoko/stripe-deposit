@@ -26,11 +26,15 @@ export default function DepositModal({ deposit, onClose, onAction }) {
 
   const formatAmount = (amount, currency = 'usd') => {
     try {
+      // Debug logging
+      console.log('DepositModal formatAmount called with:', { amount, currency });
       // Format with correct currency using imported utility
-      return formatCurrency(amount, currency);
+      const result = formatCurrency(amount, currency);
+      console.log('DepositModal formatCurrency result:', result);
+      return result;
     } catch (error) {
       // Fallback to USD if currency is not supported
-      console.warn('Currency not supported, falling back to USD:', currency);
+      console.warn('DepositModal Currency not supported, falling back to USD:', { currency, error: error.message });
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD'
