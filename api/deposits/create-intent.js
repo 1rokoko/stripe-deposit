@@ -132,13 +132,8 @@ export default async function handler(req, res) {
         currency: currency.toLowerCase(),
         customer: customer.id,
         payment_method: paymentMethodId,
-        confirmation_method: 'automatic',
         confirm: true,
         return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://stripe-deposit.vercel.app'}/deposit-status`,
-        automatic_payment_methods: {
-          enabled: true,
-          allow_redirects: 'never' // Prevent redirect-based payment methods
-        },
         description: 'Card verification charge - will be refunded automatically',
         metadata: {
           type: 'verification',
@@ -187,12 +182,7 @@ export default async function handler(req, res) {
       customer: customer.id,
       payment_method: paymentMethodId,
       capture_method: 'manual', // This creates a hold/authorization
-      confirmation_method: 'automatic', // Allow frontend to confirm with 3D Secure
       return_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://stripe-deposit.vercel.app'}/deposit-status`,
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: 'never' // Prevent redirect-based payment methods
-      },
       // DO NOT set confirm: true - this allows 3D Secure authentication
       metadata: {
         created_via: 'deposit_api_3ds',
