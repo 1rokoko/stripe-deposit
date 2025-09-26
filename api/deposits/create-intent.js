@@ -1,3 +1,12 @@
+// API configuration for Next.js
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '1mb',
+    },
+  },
+}
+
 export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,8 +31,26 @@ export default async function handler(req, res) {
       body: req.body,
       bodyType: typeof req.body,
       bodyKeys: req.body ? Object.keys(req.body) : 'no body',
-      bodyStringified: JSON.stringify(req.body)
+      bodyStringified: JSON.stringify(req.body),
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length']
     });
+
+    // Check if body is properly parsed
+    if (!req.body || typeof req.body !== 'object') {
+      console.error('❌ Request body is not properly parsed:', {
+        body: req.body,
+        bodyType: typeof req.body,
+        headers: req.headers
+      });
+      return res.status(400).json({
+        error: 'Request body is not properly parsed',
+        details: {
+          bodyType: typeof req.body,
+          contentType: req.headers['content-type']
+        }
+      });
+    }
 
     const {
       amount,
