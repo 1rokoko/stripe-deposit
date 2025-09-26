@@ -246,7 +246,7 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500"
         />
         <p className="text-xs text-gray-500 mt-1">
-          💡 Enter your complete card details. Currency will be auto-detected based on your card and location.
+          💡 Enter your complete card details. Currency will be auto-detected by your card number (BIN).
         </p>
         {error && (
           <p className="text-sm text-red-600 mt-1">{error}</p>

@@ -78,11 +78,15 @@ export default function DepositTable({
 
   const formatAmount = (amount, currency = 'usd') => {
     try {
+      // Debug logging
+      console.log('formatAmount called with:', { amount, currency });
       // Format with correct currency using imported utility
-      return formatCurrency(amount, currency);
+      const result = formatCurrency(amount, currency);
+      console.log('formatCurrency result:', result);
+      return result;
     } catch (error) {
       // Fallback to USD if currency is not supported
-      console.warn('Currency not supported, falling back to USD:', currency);
+      console.warn('Currency not supported, falling back to USD:', { currency, error: error.message });
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD'
@@ -180,7 +184,7 @@ export default function DepositTable({
                 <td className="deposit-amount">{formatAmount(deposit.amount, deposit.currency)}</td>
                 <td className="deposit-status">{getStatusBadge(deposit.status)}</td>
                 <td className="deposit-customer">{formatCustomer(deposit)}</td>
-                <td className="deposit-date">{formatDate(deposit.created_at)}</td>
+                <td className="deposit-date">{formatDate(deposit.created)}</td>
                 <td className="deposit-actions" onClick={(e) => e.stopPropagation()}>
                   <div className="action-buttons">
                     {deposit.status === 'pending' && (

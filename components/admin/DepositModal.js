@@ -123,10 +123,10 @@ export default function DepositModal({ deposit, onClose, onAction }) {
               
               <div className="info-item">
                 <label>Created</label>
-                <div className="info-value">{formatDate(deposit.created_at)}</div>
+                <div className="info-value">{formatDate(deposit.created)}</div>
               </div>
               
-              {deposit.updated_at && deposit.updated_at !== deposit.created_at && (
+              {deposit.updated_at && deposit.updated_at !== deposit.created && (
                 <div className="info-item">
                   <label>Last Updated</label>
                   <div className="info-value">{formatDate(deposit.updated_at)}</div>

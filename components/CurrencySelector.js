@@ -119,7 +119,7 @@ const CurrencySelector = ({ value, onChange, disabled = false, cardNumber = '', 
         ) : detectionSource === 'location' ? (
           <span className="text-blue-600">📍 Auto-detected from your location</span>
         ) : (
-          'Auto-detected based on your location'
+          'Auto-detected by card number (BIN)'
         )}
       </p>
 

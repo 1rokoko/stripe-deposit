@@ -122,7 +122,7 @@ async function handleGetDeposits(req, res) {
         amount: pi.amount,
         currency: pi.currency,
         status: mapStripeStatus(pi.status, amountRefunded, amountReceived),
-        created: pi.created,
+        created: new Date(pi.created * 1000).toISOString(),
         capturedAmount: amountReceived,
         refundedAmount: amountRefunded,
         metadata: pi.metadata || {}
