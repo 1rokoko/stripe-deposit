@@ -222,13 +222,12 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
 
         // Simulate successful payment for demo
         setTimeout(() => {
-          setSuccess(true);
           setProcessing(false);
           setAuthenticationStep('✅ Demo payment completed! (No real charge was made)');
 
-          // Show success message
+          // Show success message and call onSubmit callback
           setTimeout(() => {
-            onSuccess && onSuccess({
+            onSubmit && onSubmit({
               paymentIntent: result.paymentIntent,
               note: result.note || 'Mock payment for demonstration purposes'
             });
