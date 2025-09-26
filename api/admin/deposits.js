@@ -50,7 +50,7 @@ async function handleGetDeposits(req, res) {
             amount: deposit.amount, // Already in cents
             currency: deposit.currency || 'usd',
             status: deposit.status,
-            created: new Date(deposit.createdAt).getTime() / 1000,
+            created: deposit.createdAt, // Keep as ISO string for proper date formatting
             metadata: deposit.metadata || {},
             // Add fields for refund functionality
             capturedAmount: deposit.status === 'captured' ? deposit.amount : 0,
