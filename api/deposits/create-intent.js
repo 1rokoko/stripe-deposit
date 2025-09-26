@@ -189,7 +189,7 @@ export default async function handler(req, res) {
         refund_status: refund?.status || 'not_created'
       };
 
-      console.log(`✅ Card verification completed: ${verificationIntent.id}, refunded: ${refund.id}`);
+      console.log(`✅ Card verification completed: ${verificationIntent.id}, refunded: ${refund?.id || 'not_refunded'}`);
     } catch (verificationError) {
       console.error('❌ Card verification failed:', verificationError.message);
       return res.status(400).json({
