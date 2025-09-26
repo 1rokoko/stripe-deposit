@@ -159,24 +159,34 @@ export default async function handler(req, res) {
         }
       });
 
-      // Immediately refund the verification charge
-      const refund = await stripe.refunds.create({
-        payment_intent: verificationIntent.id,
-        reason: 'requested_by_customer',
-        metadata: {
-          type: 'verification_refund',
-          original_payment_intent: verificationIntent.id,
-          deposit_currency: currency,
-          deposit_amount: amount
-        }
-      });
+      console.log(`🔍 Verification PaymentIntent status: ${verificationIntent.status}`);
+
+      // Only refund if the payment was successful
+      let refund = null;
+      if (verificationIntent.status === 'succeeded') {
+        console.log(`✅ Verification successful, creating refund...`);
+        refund = await stripe.refunds.create({
+          payment_intent: verificationIntent.id,
+          reason: 'requested_by_customer',
+          metadata: {
+            type: 'verification_refund',
+            original_payment_intent: verificationIntent.id,
+            deposit_currency: currency,
+            deposit_amount: amount
+          }
+        });
+        console.log(`✅ Refund created: ${refund.id}`);
+      } else {
+        console.log(`⚠️ Verification PaymentIntent not succeeded (${verificationIntent.status}), skipping refund`);
+      }
 
       verificationResult = {
         payment_intent_id: verificationIntent.id,
-        refund_id: refund.id,
+        refund_id: refund?.id || null,
         amount: verificationAmount,
         currency: currency,
-        status: verificationIntent.status
+        status: verificationIntent.status,
+        refund_status: refund?.status || 'not_created'
       };
 
       console.log(`✅ Card verification completed: ${verificationIntent.id}, refunded: ${refund.id}`);
