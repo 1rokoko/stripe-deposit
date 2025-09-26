@@ -122,10 +122,25 @@ export default async function handler(req, res) {
     let verificationResult = null;
 
     // ALWAYS verify card with $3 charge (required for all deposits)
-    console.log(`🔄 Performing mandatory card verification with $3 charge`);
+    console.log(`🔄 Performing mandatory card verification charge`);
     try {
-      // Calculate $3 equivalent in the selected currency
-      const verificationAmount = currency === 'jpy' ? 300 : 300; // $3 or ¥300 (adjust for other currencies if needed)
+      // Calculate verification amount based on currency and minimum requirements
+      let verificationAmount;
+      switch (currency.toLowerCase()) {
+        case 'thb':
+          verificationAmount = 1000; // ฿10.00 (minimum for THB)
+          break;
+        case 'jpy':
+          verificationAmount = 300; // ¥300 (minimum for JPY)
+          break;
+        case 'eur':
+          verificationAmount = 300; // €3.00
+          break;
+        case 'usd':
+        default:
+          verificationAmount = 300; // $3.00
+          break;
+      }
 
       const verificationIntent = await stripe.paymentIntents.create({
         amount: verificationAmount,
