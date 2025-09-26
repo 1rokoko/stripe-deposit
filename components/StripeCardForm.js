@@ -215,6 +215,28 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
 
       setAuthenticationStep('Confirming payment (3D Secure authentication may be required)...');
 
+      // Check if this is a mock payment intent (for demo purposes)
+      if (result.paymentIntent.id.startsWith('pi_mock_')) {
+        console.log('🎭 Mock payment intent detected - simulating successful payment');
+        setAuthenticationStep('Mock payment completed successfully!');
+
+        // Simulate successful payment for demo
+        setTimeout(() => {
+          setSuccess(true);
+          setProcessing(false);
+          setAuthenticationStep('✅ Demo payment completed! (No real charge was made)');
+
+          // Show success message
+          setTimeout(() => {
+            onSuccess && onSuccess({
+              paymentIntent: result.paymentIntent,
+              note: result.note || 'Mock payment for demonstration purposes'
+            });
+          }, 1000);
+        }, 2000);
+        return;
+      }
+
       // Confirm payment with 3D Secure authentication support
       console.log('🔄 Confirming payment with 3D Secure support...');
       const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
