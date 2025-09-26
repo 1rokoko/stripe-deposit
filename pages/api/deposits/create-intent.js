@@ -47,14 +47,22 @@ export default async function handler(req, res) {
 
     if (!stripeKey) {
       console.error('❌ Stripe key not found:', { mode, testKeyExists: !!testKey, liveKeyExists: !!liveKey });
-      
+
+      // For live mode without proper key, return error immediately
+      if (mode === 'live') {
+        return res.status(500).json({
+          error: 'Stripe configuration error',
+          message: 'Live Stripe key not configured. Please contact administrator.'
+        });
+      }
+
       // In test mode, create a mock response for demonstration
       if (mode === 'test') {
         console.log('🎭 Creating mock payment intent for demo purposes');
-        
+
         const mockPaymentIntent = {
           id: `pi_mock_${Date.now()}`,
-          amount: parseInt(amount),
+          amount: Math.round(parseFloat(amount) * 100), // Convert to cents for mock too
           currency: normalizedCurrency,
           status: 'requires_capture',
           client_secret: `pi_mock_${Date.now()}_secret_mock`,
@@ -65,7 +73,7 @@ export default async function handler(req, res) {
             mode: 'test'
           }
         };
-        
+
         return res.status(200).json({
           success: true,
           paymentIntent: mockPaymentIntent,
@@ -73,8 +81,8 @@ export default async function handler(req, res) {
           note: 'This is a mock payment intent for demonstration purposes. No real charge was created.'
         });
       }
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         error: 'Stripe configuration error',
         message: `Stripe ${mode} key not configured`
       });
@@ -85,7 +93,14 @@ export default async function handler(req, res) {
     console.log(`✅ Stripe initialized in ${mode} mode`);
 
     // Convert amount to cents (Stripe expects amounts in smallest currency unit)
-    const amountInCents = parseInt(amount);
+    // Amount comes in dollars/major currency unit, need to convert to cents
+    const amountInCents = Math.round(parseFloat(amount) * 100);
+    console.log('💰 Amount conversion:', {
+      originalAmount: amount,
+      parsedFloat: parseFloat(amount),
+      amountInCents,
+      currency: normalizedCurrency
+    });
     
     // Create payment intent
     const paymentIntentParams = {
