@@ -146,10 +146,14 @@ export default function AdminDashboard() {
         return;
       }
 
-      const body = amount ? { amount: amount } : {};
+      const body = {
+        depositId,
+        action,
+        ...(amount ? { amount: amount } : {})
+      };
 
       // Use proper admin API for actions
-      const response = await fetch(`/api/admin/deposits/${depositId}/${action}`, {
+      const response = await fetch(`/api/admin/deposit-action`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${adminToken}`,
