@@ -24,8 +24,19 @@ export default async function handler(req, res) {
       verifyCard = false
     } = req.body;
 
+    // Debug logging
+    console.log('🔍 API Request received:', {
+      amount,
+      currency,
+      customerId,
+      paymentMethodId: paymentMethodId ? 'present' : 'missing',
+      metadata,
+      mode: req.headers['x-stripe-mode'] || 'test'
+    });
+
     // Validate required fields
     if (!amount || !customerId || !paymentMethodId) {
+      console.error('❌ Missing required fields:', { amount, customerId, paymentMethodId });
       return res.status(400).json({
         error: 'Missing required fields: amount, customerId, paymentMethodId'
       });
@@ -38,7 +49,9 @@ export default async function handler(req, res) {
     let currencyConfig;
     try {
       currencyConfig = getCurrencyConfig(currency);
+      console.log('✅ Currency config loaded:', { currency, config: currencyConfig });
     } catch (error) {
+      console.error('❌ Unsupported currency:', { currency, error: error.message });
       return res.status(400).json({
         error: `Unsupported currency: ${currency}`
       });
@@ -46,8 +59,13 @@ export default async function handler(req, res) {
 
     // Validate amount for the selected currency
     const amountValue = parseFloat(amount);
+    console.log('🔍 Amount validation:', { amount, amountValue, currency });
+
     const validation = validateAmount(amountValue, currency);
+    console.log('🔍 Validation result:', validation);
+
     if (!validation.valid) {
+      console.error('❌ Amount validation failed:', validation);
       return res.status(400).json({
         error: validation.error
       });
@@ -55,6 +73,7 @@ export default async function handler(req, res) {
 
     // Convert to Stripe format (smallest currency unit)
     const amountInCents = toStripeAmount(amountValue, currency);
+    console.log('✅ Amount converted to Stripe format:', { amountValue, amountInCents, currency });
 
     // Get mode from headers or default to test
     const mode = req.headers['x-stripe-mode'] || 'test';
