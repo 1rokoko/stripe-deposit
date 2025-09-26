@@ -31,7 +31,8 @@ export default async function handler(req, res) {
       customerId,
       paymentMethodId: paymentMethodId ? 'present' : 'missing',
       metadata,
-      mode: req.headers['x-stripe-mode'] || 'test'
+      mode: req.headers['x-stripe-mode'] || 'test',
+      body: req.body
     });
 
     // Validate required fields
@@ -45,23 +46,27 @@ export default async function handler(req, res) {
     // Import currency utilities
     const { getCurrencyConfig, validateAmount, toStripeAmount } = require('../../utils/currency');
 
+    // Normalize currency to lowercase
+    const normalizedCurrency = currency.toLowerCase();
+    console.log('🔍 Currency normalization:', { original: currency, normalized: normalizedCurrency });
+
     // Validate currency
     let currencyConfig;
     try {
-      currencyConfig = getCurrencyConfig(currency);
-      console.log('✅ Currency config loaded:', { currency, config: currencyConfig });
+      currencyConfig = getCurrencyConfig(normalizedCurrency);
+      console.log('✅ Currency config loaded:', { currency: normalizedCurrency, config: currencyConfig });
     } catch (error) {
-      console.error('❌ Unsupported currency:', { currency, error: error.message });
+      console.error('❌ Unsupported currency:', { currency: normalizedCurrency, error: error.message });
       return res.status(400).json({
-        error: `Unsupported currency: ${currency}`
+        error: `Unsupported currency: ${normalizedCurrency}`
       });
     }
 
     // Validate amount for the selected currency
     const amountValue = parseFloat(amount);
-    console.log('🔍 Amount validation:', { amount, amountValue, currency });
+    console.log('🔍 Amount validation:', { amount, amountValue, currency: normalizedCurrency });
 
-    const validation = validateAmount(amountValue, currency);
+    const validation = validateAmount(amountValue, normalizedCurrency);
     console.log('🔍 Validation result:', validation);
 
     if (!validation.valid) {
@@ -72,8 +77,8 @@ export default async function handler(req, res) {
     }
 
     // Convert to Stripe format (smallest currency unit)
-    const amountInCents = toStripeAmount(amountValue, currency);
-    console.log('✅ Amount converted to Stripe format:', { amountValue, amountInCents, currency });
+    const amountInCents = toStripeAmount(amountValue, normalizedCurrency);
+    console.log('✅ Amount converted to Stripe format:', { amountValue, amountInCents, currency: normalizedCurrency });
 
     // Get mode from headers or default to test
     const mode = req.headers['x-stripe-mode'] || 'test';
@@ -88,7 +93,7 @@ export default async function handler(req, res) {
     console.log(`🔄 Creating payment intent in ${mode} mode for ${currencyConfig.symbol}${amount}`, {
       mode,
       amount,
-      currency,
+      currency: normalizedCurrency,
       customerId,
       paymentMethodId
     });
@@ -145,7 +150,7 @@ export default async function handler(req, res) {
     try {
       // Calculate verification amount based on currency and minimum requirements
       let verificationAmount;
-      switch (currency.toLowerCase()) {
+      switch (normalizedCurrency) {
         case 'thb':
           verificationAmount = 1000; // ฿10.00 (minimum for THB)
           break;
@@ -163,7 +168,7 @@ export default async function handler(req, res) {
 
       const verificationIntent = await stripe.paymentIntents.create({
         amount: verificationAmount,
-        currency: currency.toLowerCase(),
+        currency: normalizedCurrency,
         customer: customer.id,
         payment_method: paymentMethodId,
         confirm: true,
@@ -173,7 +178,7 @@ export default async function handler(req, res) {
           type: 'verification',
           mode: mode,
           created_at: new Date().toISOString(),
-          deposit_currency: currency,
+          deposit_currency: normalizedCurrency,
           deposit_amount: amount
         }
       });
@@ -190,7 +195,7 @@ export default async function handler(req, res) {
           metadata: {
             type: 'verification_refund',
             original_payment_intent: verificationIntent.id,
-            deposit_currency: currency,
+            deposit_currency: normalizedCurrency,
             deposit_amount: amount
           }
         });
@@ -203,7 +208,7 @@ export default async function handler(req, res) {
         payment_intent_id: verificationIntent.id,
         refund_id: refund?.id || null,
         amount: verificationAmount,
-        currency: currency,
+        currency: normalizedCurrency,
         status: verificationIntent.status,
         refund_status: refund?.status || 'not_created'
       };
@@ -222,7 +227,7 @@ export default async function handler(req, res) {
     // Create payment intent WITHOUT immediate confirmation for 3D Secure support
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
-      currency,
+      currency: normalizedCurrency,
       customer: customer.id,
       payment_method: paymentMethodId,
       capture_method: 'manual', // This creates a hold/authorization
@@ -232,7 +237,7 @@ export default async function handler(req, res) {
         created_via: 'deposit_api_3ds',
         mode: mode,
         original_amount: amount,
-        currency: currency,
+        currency: normalizedCurrency,
         verified_card: 'true', // Always true now since verification is mandatory
         verification_intent: verificationResult?.payment_intent_id || 'none',
         verification_refund: verificationResult?.refund_id || 'none',
