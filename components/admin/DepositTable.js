@@ -79,14 +79,14 @@ export default function DepositTable({
   const formatAmount = (amount, currency = 'usd') => {
     try {
       // Debug logging
-      console.log('formatAmount called with:', { amount, currency });
+      console.log('DepositTable formatAmount called with:', { amount, currency, type: typeof amount, currencyType: typeof currency });
       // Format with correct currency using imported utility
       const result = formatCurrency(amount, currency);
-      console.log('formatCurrency result:', result);
+      console.log('DepositTable formatCurrency result:', result);
       return result;
     } catch (error) {
       // Fallback to USD if currency is not supported
-      console.warn('Currency not supported, falling back to USD:', { currency, error: error.message });
+      console.warn('DepositTable Currency not supported, falling back to USD:', { currency, error: error.message });
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD'
@@ -95,13 +95,39 @@ export default function DepositTable({
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      console.log('DepositTable formatDate called with:', { dateString, type: typeof dateString });
+
+      // Handle different date formats
+      let date;
+      if (typeof dateString === 'string') {
+        // If it's an ISO string, parse it directly
+        date = new Date(dateString);
+      } else if (typeof dateString === 'number') {
+        // If it's a timestamp, convert to milliseconds if needed
+        date = new Date(dateString > 1000000000000 ? dateString : dateString * 1000);
+      } else {
+        throw new Error('Invalid date format');
+      }
+
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date');
+      }
+
+      const result = date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      console.log('DepositTable formatDate result:', result);
+      return result;
+    } catch (error) {
+      console.warn('DepositTable Date formatting failed:', { dateString, error: error.message });
+      return 'Invalid Date';
+    }
   };
 
   const formatCustomer = (deposit) => {
