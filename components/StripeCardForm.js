@@ -146,6 +146,8 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
 
     try {
       setAuthenticationStep('Creating payment method...');
+      console.log('🔄 Creating payment method with mode:', mode);
+
       // Create payment method
       const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
@@ -158,13 +160,34 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       });
 
       if (paymentMethodError) {
+        console.error('❌ Payment method creation failed:', paymentMethodError);
         setError(paymentMethodError.message);
         setProcessing(false);
         setAuthenticationStep('');
         return;
       }
 
+      console.log('✅ Payment method created successfully:', paymentMethod.id);
+
       setAuthenticationStep('Creating payment intent...');
+
+      const requestBody = {
+        amount: amountValue,
+        currency: currency,
+        customerId: `customer_${Date.now()}`, // Generate unique customer ID
+        paymentMethodId: paymentMethod.id,
+        metadata: {
+          created_via: 'stripe_card_form',
+          mode: mode,
+          currency: currency
+        }
+      };
+
+      console.log('🔄 Sending API request:', {
+        url: '/api/deposits/create-intent',
+        mode: mode,
+        body: requestBody
+      });
 
       // Create payment intent on backend
       const response = await fetch('/api/deposits/create-intent', {
@@ -173,22 +196,14 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
           'Content-Type': 'application/json',
           'x-stripe-mode': mode
         },
-        body: JSON.stringify({
-          amount: amountValue,
-          currency: currency,
-          customerId: `customer_${Date.now()}`, // Generate unique customer ID
-          paymentMethodId: paymentMethod.id,
-          metadata: {
-            created_via: 'stripe_card_form',
-            mode: mode,
-            currency: currency
-          }
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const result = await response.json();
+      console.log('📥 API response:', { status: response.status, result });
 
       if (!response.ok) {
+        console.error('❌ API request failed:', { status: response.status, error: result.error });
         setError(result.error || 'Failed to create payment intent');
         setProcessing(false);
         setAuthenticationStep('');
