@@ -17,7 +17,7 @@ export default function DepositTable({
   onBulkSelectionChange,
   showBulkActions = false
 }) {
-  const [sortField, setSortField] = useState('created_at');
+  const [sortField, setSortField] = useState('created');
   const [sortDirection, setSortDirection] = useState('desc');
 
   const handleSort = (field) => {
@@ -185,8 +185,8 @@ export default function DepositTable({
               <th onClick={() => handleSort('customer_id')} className="sortable">
                 Customer {sortField === 'customer_id' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
-              <th onClick={() => handleSort('created_at')} className="sortable">
-                Created {sortField === 'created_at' && (sortDirection === 'asc' ? '↑' : '↓')}
+              <th onClick={() => handleSort('created')} className="sortable">
+                Created {sortField === 'created' && (sortDirection === 'asc' ? '↑' : '↓')}
               </th>
               <th className="actions-column">Actions</th>
             </tr>
@@ -212,7 +212,7 @@ export default function DepositTable({
                   <span className="id-text">{deposit.id.substring(0, 8)}...</span>
                   <span className="id-full">{deposit.id}</span>
                 </td>
-                <td className="deposit-amount">{formatAmount(deposit.amount, deposit.currency)}</td>
+                <td className="deposit-amount">{formatAmount(deposit.amount, deposit.currency?.toLowerCase() || 'usd')}</td>
                 <td className="deposit-status">{getStatusBadge(deposit.status)}</td>
                 <td className="deposit-customer">{formatCustomer(deposit)}</td>
                 <td className="deposit-date">{formatDate(deposit.created)}</td>
