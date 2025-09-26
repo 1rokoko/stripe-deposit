@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { formatCurrency } from '../../utils/currency';
 
 export default function DepositModal({ deposit, onClose, onAction }) {
   const [loading, setLoading] = useState(false);
@@ -23,11 +24,18 @@ export default function DepositModal({ deposit, onClose, onAction }) {
     }
   };
 
-  const formatAmount = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount / 100);
+  const formatAmount = (amount, currency = 'usd') => {
+    try {
+      // Format with correct currency using imported utility
+      return formatCurrency(amount, currency);
+    } catch (error) {
+      // Fallback to USD if currency is not supported
+      console.warn('Currency not supported, falling back to USD:', currency);
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(amount / 100);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -87,7 +95,7 @@ export default function DepositModal({ deposit, onClose, onAction }) {
                 </div>
               </div>
               <div className="amount-display">
-                {formatAmount(deposit.amount)}
+                {formatAmount(deposit.amount, deposit.currency)}
               </div>
             </div>
           </div>

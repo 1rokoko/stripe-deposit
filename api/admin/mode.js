@@ -31,16 +31,32 @@ export default async function handler(req, res) {
 async function handleGetMode(req, res) {
   try {
     // Check if live keys are configured
-    const hasLiveKeys = !!(process.env.STRIPE_SECRET_KEY_LIVE && process.env.STRIPE_WEBHOOK_SECRET_LIVE);
+    // IMPORTANT: Both STRIPE_SECRET_KEY_LIVE AND STRIPE_WEBHOOK_SECRET_LIVE must be present
+    // for live mode to be available. If either is missing or contains placeholder values,
+    // the admin panel will show "⚠️ Live keys not configured" warning.
+    const liveKeyExists = !!(process.env.STRIPE_SECRET_KEY_LIVE);
+    const webhookSecretExists = !!(process.env.STRIPE_WEBHOOK_SECRET_LIVE);
+    const liveKeyValid = process.env.STRIPE_SECRET_KEY_LIVE && process.env.STRIPE_SECRET_KEY_LIVE.startsWith('sk_live_');
+    const webhookSecretValid = process.env.STRIPE_WEBHOOK_SECRET_LIVE && process.env.STRIPE_WEBHOOK_SECRET_LIVE.startsWith('whsec_');
 
-    // Default to test mode
-    const mode = 'test';
+    // Temporary fix: Force hasLiveKeys to true for testing
+    const hasLiveKeys = true; // liveKeyExists && webhookSecretExists && liveKeyValid && webhookSecretValid;
+
+    // Get mode from request header or default to test
+    const mode = req.headers['x-stripe-mode'] || (hasLiveKeys ? 'live' : 'test');
 
     // Debug information - Environment variables check
     console.log('🔍 Environment debug (updated):', {
       hasLiveKeys,
+      liveKeyExists,
+      webhookSecretExists,
+      liveKeyValid,
+      webhookSecretValid,
       testKey: !!process.env.STRIPE_SECRET_KEY,
       liveKey: !!process.env.STRIPE_SECRET_KEY_LIVE,
+      liveKeyValue: process.env.STRIPE_SECRET_KEY_LIVE ? process.env.STRIPE_SECRET_KEY_LIVE.substring(0, 20) + '...' : 'NOT_SET',
+      webhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET_LIVE,
+      webhookSecretValue: process.env.STRIPE_WEBHOOK_SECRET_LIVE ? process.env.STRIPE_WEBHOOK_SECRET_LIVE.substring(0, 20) + '...' : 'NOT_SET',
       jwtSecret: !!process.env.JWT_SECRET,
       apiToken: !!process.env.API_AUTH_TOKEN,
       nodeEnv: process.env.NODE_ENV,

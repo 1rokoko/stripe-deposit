@@ -36,7 +36,9 @@ async function handleGetDeposits(req, res) {
     if (mode === 'test') {
       // In test mode, fetch from demo API to show demo deposits
       try {
-        const demoResponse = await fetch('https://stripe-deposit.vercel.app/api/demo/deposits');
+        // Use relative URL to avoid domain issues
+        const baseUrl = req.headers.host ? `https://${req.headers.host}` : 'https://stripe-deposit.vercel.app';
+        const demoResponse = await fetch(`${baseUrl}/api/demo/deposits`);
         if (demoResponse.ok) {
           const demoData = await demoResponse.json();
           const demoDeposits = demoData.deposits || [];

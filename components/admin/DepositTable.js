@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { TableAnnouncer, LoadingAnnouncer } from '../accessibility/ScreenReaderUtils';
 import { useKeyboardNavigation } from '../accessibility/KeyboardNavigation';
 import Badge from '../ui/Badge';
+import { formatCurrency, fromStripeAmount } from '../../utils/currency';
 
 export default function DepositTable({ 
   deposits, 
@@ -75,11 +76,18 @@ export default function DepositTable({
     );
   };
 
-  const formatAmount = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount / 100);
+  const formatAmount = (amount, currency = 'usd') => {
+    try {
+      // Format with correct currency using imported utility
+      return formatCurrency(amount, currency);
+    } catch (error) {
+      // Fallback to USD if currency is not supported
+      console.warn('Currency not supported, falling back to USD:', currency);
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(amount / 100);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -169,7 +177,7 @@ export default function DepositTable({
                   <span className="id-text">{deposit.id.substring(0, 8)}...</span>
                   <span className="id-full">{deposit.id}</span>
                 </td>
-                <td className="deposit-amount">{formatAmount(deposit.amount)}</td>
+                <td className="deposit-amount">{formatAmount(deposit.amount, deposit.currency)}</td>
                 <td className="deposit-status">{getStatusBadge(deposit.status)}</td>
                 <td className="deposit-customer">{formatCustomer(deposit)}</td>
                 <td className="deposit-date">{formatDate(deposit.created_at)}</td>

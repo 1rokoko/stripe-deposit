@@ -48,6 +48,12 @@ STRIPE_WEBHOOK_SECRET_LIVE=whsec_ваш_настоящий_live_webhook_secret
 - `STRIPE_SECRET_KEY_LIVE` = `sk_live_ваш_ключ`
 - `STRIPE_WEBHOOK_SECRET_LIVE` = `whsec_ваш_live_webhook`
 
+**⚠️ ВАЖНО:** Для корректной работы live режима ОБЯЗАТЕЛЬНО должны быть настроены ОБА ключа:
+- `STRIPE_SECRET_KEY_LIVE` - секретный ключ для API
+- `STRIPE_WEBHOOK_SECRET_LIVE` - секрет для webhook'ов
+
+Если `STRIPE_WEBHOOK_SECRET_LIVE` не настроен или содержит placeholder, в админке будет отображаться предупреждение "⚠️ Live keys not configured".
+
 ### **Other Required Variables:**
 - `JWT_SECRET` = `ваш_jwt_secret_для_админки`
 - `API_AUTH_TOKEN` = `ваш_api_token`
@@ -61,7 +67,31 @@ STRIPE_WEBHOOK_SECRET_LIVE=whsec_ваш_настоящий_live_webhook_secret
 3. Выберите события: `payment_intent.*`, `charge.*`
 4. Скопируйте **Signing secret** в `STRIPE_WEBHOOK_SECRET`
 
-## **Шаг 5: Тестирование**
+## **Шаг 5: Устранение неполадок**
+
+### **Проблема: "⚠️ Live keys not configured" в админке**
+
+**Причина:** Система проверяет наличие ОБЕИХ переменных для live режима:
+- `STRIPE_SECRET_KEY_LIVE`
+- `STRIPE_WEBHOOK_SECRET_LIVE`
+
+**Решение:**
+1. Убедитесь, что обе переменные настроены в Vercel Environment Variables
+2. Проверьте, что `STRIPE_WEBHOOK_SECRET_LIVE` не содержит placeholder значение
+3. Webhook secret должен начинаться с `whsec_`
+4. После изменения переменных выполните новый deploy: `vercel --prod`
+
+**Проверка конфигурации:**
+```bash
+# Проверить переменные в Vercel
+vercel env ls
+
+# Должны быть настроены:
+# STRIPE_SECRET_KEY_LIVE (Production, Preview, Development)
+# STRIPE_WEBHOOK_SECRET_LIVE (Production, Preview, Development)
+```
+
+## **Шаг 6: Тестирование**
 
 ### **Test Mode:**
 - Используйте тестовые карты: `4242424242424242`

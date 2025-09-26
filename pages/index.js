@@ -331,6 +331,16 @@ export default function Home() {
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Deposit</h2>
 
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3">💡 How Deposits Work</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Deposits are held securely and not charged immediately</li>
+                    <li>• You can capture (charge) or release (cancel) deposits later</li>
+                    <li>• All transactions are processed through Stripe's secure platform</li>
+                    <li>• {mode === 'test' ? 'Test mode uses demo data - no real charges are made' : 'Live mode processes real transactions with your card'}</li>
+                  </ul>
+                </div>
+
                 {mode === 'live' && (
                   <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <h3 className="text-lg font-semibold text-red-800 mb-2">⚠️ LIVE MODE WARNING</h3>
@@ -341,29 +351,11 @@ export default function Home() {
                   </div>
                 )}
 
-                {mode === 'live' ? (
-                  <StripeCardForm
-                    onSubmit={handleSecureDepositSubmit}
-                    loading={loading}
-                    mode={mode}
-                  />
-                ) : (
-                  <DepositForm
-                    onSubmit={handleDepositSubmit}
-                    loading={loading}
-                    mode={mode}
-                  />
-                )}
-
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="text-lg font-semibold text-gray-800 mb-3">💡 How Deposits Work</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Deposits are held securely and not charged immediately</li>
-                    <li>• You can capture (charge) or release (cancel) deposits later</li>
-                    <li>• All transactions are processed through Stripe's secure platform</li>
-                    <li>• {mode === 'test' ? 'Test mode uses demo data - no real charges are made' : 'Live mode processes real transactions with your card'}</li>
-                  </ul>
-                </div>
+                <StripeCardForm
+                  onSubmit={handleSecureDepositSubmit}
+                  loading={loading}
+                  mode={mode}
+                />
               </div>
             </div>
 

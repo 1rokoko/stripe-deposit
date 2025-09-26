@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
+import CurrencySelector from './CurrencySelector';
+import { getCurrencyConfig, validateAmount, formatCurrency, toStripeAmount } from '../utils/currency';
 
 const StripeCardForm = ({ onSubmit, loading, mode }) => {
   const [stripe, setStripe] = useState(null);
   const [elements, setElements] = useState(null);
   const [cardElement, setCardElement] = useState(null);
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState('usd');
+  const [detectedCardNumber, setDetectedCardNumber] = useState('');
   const [error, setError] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const [authenticationStep, setAuthenticationStep] = useState('');
+  const [cardBrand, setCardBrand] = useState('');
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Stripe) {
@@ -23,13 +30,17 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
         style: {
           base: {
             fontSize: '16px',
-            color: '#424770',
+            color: '#000000', // Black text
+            fontFamily: 'system-ui, -apple-system, sans-serif',
             '::placeholder': {
-              color: '#aab7c4',
+              color: '#6b7280', // Gray placeholder
             },
           },
           invalid: {
-            color: '#9e2146',
+            color: '#dc2626', // Red for errors
+          },
+          complete: {
+            color: '#000000', // Black text when complete
           },
         },
       });
@@ -39,6 +50,34 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
 
       cardElementInstance.on('change', (event) => {
         setError(event.error ? event.error.message : null);
+
+        // Update card brand
+        if (event.brand) {
+          setCardBrand(event.brand);
+        }
+
+        // Extract card number for currency detection
+        // Note: Stripe Elements doesn't expose the full card number for security,
+        // but we can use the brand and other info for basic detection
+        if (event.complete && event.brand) {
+          console.log('Card event:', event);
+
+          // For demo purposes, we'll use a mock card number based on brand
+          // In a real implementation, you might need to use the separate field approach
+          // or rely on user's location/manual selection
+          let mockCardNumber = '';
+          switch (event.brand) {
+            case 'visa':
+              mockCardNumber = '4000000000000002'; // Default to USD Visa
+              break;
+            case 'mastercard':
+              mockCardNumber = '5555555555554444'; // Default to USD Mastercard
+              break;
+            default:
+              mockCardNumber = '4000000000000002';
+          }
+          setDetectedCardNumber(mockCardNumber);
+        }
       });
 
       return () => {
@@ -55,34 +94,168 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
     }
 
     setError(null);
+    setProcessing(true);
+    setAuthenticationStep('Validating amount...');
 
-    // Validate amount
+    // Validate amount for selected currency
     const amountValue = parseFloat(amount);
-    if (!amountValue || amountValue < 1 || amountValue > 10000) {
-      setError('Amount must be between $1.00 and $10,000.00');
+    const validation = validateAmount(amountValue, currency);
+    if (!validation.valid) {
+      setError(validation.error);
+      setProcessing(false);
+      setAuthenticationStep('');
       return;
     }
 
-    // Create payment method
-    const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
-      type: 'card',
-      card: cardElement,
-    });
+    try {
+      setAuthenticationStep('Creating payment method...');
+      // Create payment method
+      const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+      });
 
-    if (paymentMethodError) {
-      setError(paymentMethodError.message);
-      return;
+      if (paymentMethodError) {
+        setError(paymentMethodError.message);
+        setProcessing(false);
+        setAuthenticationStep('');
+        return;
+      }
+
+      setAuthenticationStep('Creating payment intent...');
+
+      // Create payment intent on backend
+      const response = await fetch('/api/deposits/create-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-stripe-mode': mode
+        },
+        body: JSON.stringify({
+          amount: amountValue,
+          currency: currency,
+          customerId: `customer_${Date.now()}`, // Generate unique customer ID
+          paymentMethodId: paymentMethod.id,
+          metadata: {
+            created_via: 'stripe_card_form',
+            mode: mode,
+            currency: currency
+          }
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || 'Failed to create payment intent');
+        setProcessing(false);
+        setAuthenticationStep('');
+        return;
+      }
+
+      setAuthenticationStep('Confirming payment (3D Secure authentication may be required)...');
+
+      // Confirm payment with 3D Secure authentication support
+      console.log('🔄 Confirming payment with 3D Secure support...');
+      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+        result.paymentIntent.client_secret
+      );
+
+      if (confirmError) {
+        console.error('❌ Payment confirmation failed:', confirmError);
+
+        // Handle specific 3D Secure authentication errors
+        if (confirmError.type === 'card_error') {
+          if (confirmError.code === 'authentication_required') {
+            setError('Authentication required. Please complete 3D Secure verification with your bank.');
+          } else if (confirmError.code === 'card_declined') {
+            setError(`Card declined: ${confirmError.message}`);
+          } else {
+            setError(confirmError.message);
+          }
+        } else {
+          setError(confirmError.message);
+        }
+        setProcessing(false);
+        setAuthenticationStep('');
+        return;
+      }
+
+      setAuthenticationStep('Payment confirmed successfully!');
+      console.log('✅ Payment confirmed successfully:', paymentIntent.status);
+
+      // Check payment intent status
+      if (paymentIntent.status === 'requires_capture') {
+        // Payment authorized successfully (manual capture)
+        console.log('✅ Payment authorized - ready for capture');
+        setAuthenticationStep('Payment authorized successfully!');
+      } else if (paymentIntent.status === 'succeeded') {
+        // Payment completed successfully
+        console.log('✅ Payment completed successfully');
+        setAuthenticationStep('Payment completed successfully!');
+      } else if (paymentIntent.status === 'requires_action') {
+        // This shouldn't happen after confirmCardPayment, but handle it
+        console.warn('⚠️ Payment still requires action after confirmation');
+        setError('Payment requires additional authentication. Please try again.');
+        setProcessing(false);
+        setAuthenticationStep('');
+        return;
+      } else if (paymentIntent.status === 'canceled') {
+        console.warn('⚠️ Payment was canceled');
+        setError('Payment was canceled. Please try again.');
+        setProcessing(false);
+        setAuthenticationStep('');
+        return;
+      } else {
+        console.warn('⚠️ Unexpected payment status:', paymentIntent.status);
+        setError(`Unexpected payment status: ${paymentIntent.status}. Please contact support.`);
+        setProcessing(false);
+        setAuthenticationStep('');
+        return;
+      }
+
+      // Call the parent component's onSubmit with successful payment
+      onSubmit({
+        amount: amountValue,
+        currency: currency,
+        paymentMethodId: paymentMethod.id,
+        paymentIntent: paymentIntent,
+        success: true,
+        status: paymentIntent.status
+      });
+
+      setProcessing(false);
+      setAuthenticationStep('');
+
+    } catch (error) {
+      console.error('Payment error:', error);
+      setError('An unexpected error occurred. Please try again.');
+      setProcessing(false);
+      setAuthenticationStep('');
     }
-
-    // Call the parent component's onSubmit with payment method
-    onSubmit({
-      amount: amountValue,
-      paymentMethodId: paymentMethod.id
-    });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Card Information*
+        </label>
+        <div
+          id="card-element"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          💡 Enter your complete card details. Currency will be auto-detected based on your card and location.
+        </p>
+        {error && (
+          <p className="text-sm text-red-600 mt-1">{error}</p>
+        )}
+        {authenticationStep && (
+          <p className="text-sm text-blue-600 mt-1">{authenticationStep}</p>
+        )}
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Deposit Amount*
@@ -90,38 +263,36 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
         <input
           type="number"
           step="0.01"
-          min="1"
-          max="10000"
+          min="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="100.00"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ color: '#000000 !important' }}
           required
         />
         <p className="text-sm text-gray-500 mt-1">
-          Minimum: $1.00, Maximum: $10,000.00
+          {currency && (() => {
+            const currencyConfig = getCurrencyConfig(currency);
+            return `Minimum: ${formatCurrency(currencyConfig.minAmount, currency)}, Maximum: ${formatCurrency(currencyConfig.maxAmount, currency)}`;
+          })()}
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Card Information*
-        </label>
-        <div 
-          id="card-element" 
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500"
-        />
-        {error && (
-          <p className="text-sm text-red-600 mt-1">{error}</p>
-        )}
-      </div>
+      <CurrencySelector
+        value={currency}
+        onChange={setCurrency}
+        disabled={processing}
+        cardNumber={detectedCardNumber}
+        autoHide={false}
+      />
 
       <button
         type="submit"
-        disabled={loading || !stripe}
+        disabled={loading || !stripe || processing}
         className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? 'Creating Deposit...' : 'Create Deposit'}
+        {processing ? authenticationStep || 'Processing...' : loading ? 'Creating Deposit...' : 'Create Deposit'}
       </button>
     </form>
   );

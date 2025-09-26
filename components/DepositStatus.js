@@ -4,6 +4,7 @@ import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Modal } from './ui/Modal';
 import { LoadingSpinner } from './ui/LoadingSpinner';
+import { formatCurrency } from '../utils/currency';
 
 export default function DepositStatus({ deposits, onAction, onRefresh }) {
   const [selectedDeposit, setSelectedDeposit] = useState(null);
@@ -23,8 +24,15 @@ export default function DepositStatus({ deposits, onAction, onRefresh }) {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const formatAmount = (amount) => {
-    return `$${(amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+  const formatAmount = (amount, currency = 'usd') => {
+    try {
+      // Format with correct currency using imported utility
+      return formatCurrency(amount, currency);
+    } catch (error) {
+      // Fallback to USD if currency is not supported
+      console.warn('Currency not supported, falling back to USD:', currency);
+      return `$${(amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    }
   };
 
   const formatDate = (dateString) => {
@@ -60,6 +68,8 @@ export default function DepositStatus({ deposits, onAction, onRefresh }) {
   }, {});
 
   const totalAmount = deposits.reduce((sum, deposit) => sum + deposit.amount, 0);
+  // For total amount, we'll use USD as default since it's a mixed currency total
+  const totalCurrency = 'usd';
 
   if (deposits.length === 0) {
     return (
@@ -85,7 +95,7 @@ export default function DepositStatus({ deposits, onAction, onRefresh }) {
           <div className="text-sm text-gray-600">Total Deposits</div>
         </Card>
         <Card className="p-4">
-          <div className="text-2xl font-bold text-green-600">{formatAmount(totalAmount)}</div>
+          <div className="text-2xl font-bold text-green-600">{formatAmount(totalAmount, totalCurrency)}</div>
           <div className="text-sm text-gray-600">Total Amount</div>
         </Card>
         <Card className="p-4">
@@ -137,7 +147,7 @@ export default function DepositStatus({ deposits, onAction, onRefresh }) {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-600">
                   <div>
-                    <span className="font-medium">Amount:</span> {formatAmount(deposit.amount)}
+                    <span className="font-medium">Amount:</span> {formatAmount(deposit.amount, deposit.currency)}
                   </div>
                   <div>
                     <span className="font-medium">Customer:</span> {deposit.customerId || deposit.customer_id}
@@ -224,7 +234,7 @@ export default function DepositStatus({ deposits, onAction, onRefresh }) {
               <div>
                 <span className="font-medium text-gray-700">Amount:</span>
                 <div className="text-lg font-semibold text-gray-900">
-                  {formatAmount(selectedDeposit.amount)}
+                  {formatAmount(selectedDeposit.amount, selectedDeposit.currency)}
                 </div>
               </div>
               <div>
