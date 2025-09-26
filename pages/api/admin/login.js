@@ -11,24 +11,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { username, password } = req.body;
+    const { email, username, password } = req.body;
+
+    // Support both email and username for login
+    const loginField = email || username;
 
     // Simple admin authentication (in production, use proper password hashing)
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@stripe-deposit.com';
     const adminUsername = process.env.ADMIN_USERNAME || 'admin';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
-    if (username !== adminUsername || password !== adminPassword) {
-      return res.status(401).json({ 
+    // Check if login matches either email or username
+    const isValidUser = (loginField === adminEmail || loginField === adminUsername) && password === adminPassword;
+
+    if (!isValidUser) {
+      return res.status(401).json({
         error: 'Invalid credentials',
-        message: 'Username or password is incorrect'
+        message: 'Email/username or password is incorrect'
       });
     }
 
     // Generate JWT token
     const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
     const token = jwt.sign(
-      { 
+      {
         id: 'admin',
+        email: adminEmail,
         username: adminUsername,
         role: 'admin',
         type: 'jwt'
@@ -44,6 +52,7 @@ export default async function handler(req, res) {
       token,
       admin: {
         id: 'admin',
+        email: adminEmail,
         username: adminUsername,
         role: 'admin'
       }
