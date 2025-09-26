@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { formatCurrency } from '../../utils/currency';
+import { formatCurrency, fromStripeAmount } from '../../utils/currency';
 
 export default function DepositModal({ deposit, onClose, onAction }) {
   const [loading, setLoading] = useState(false);
@@ -28,8 +28,13 @@ export default function DepositModal({ deposit, onClose, onAction }) {
     try {
       // Debug logging
       console.log('DepositModal formatAmount called with:', { amount, currency, type: typeof amount, currencyType: typeof currency });
+
+      // Convert from Stripe amount (cents) to display amount
+      const displayAmount = fromStripeAmount(amount, currency);
+      console.log('DepositModal converted amount:', { amount, displayAmount, currency });
+
       // Format with correct currency using imported utility
-      const result = formatCurrency(amount, currency);
+      const result = formatCurrency(displayAmount, currency);
       console.log('DepositModal formatCurrency result:', result);
       return result;
     } catch (error) {

@@ -29,6 +29,7 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       setElements(elementsInstance);
 
       const cardElementInstance = elementsInstance.create('card', {
+        hidePostalCode: false, // Always show postal code field
         style: {
           base: {
             fontSize: '16px',
