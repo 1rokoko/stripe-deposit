@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import CurrencySelector from './CurrencySelector';
+import CardNumberInput from './CardNumberInput';
 import { getCurrencyConfig, validateAmount, formatCurrency, toStripeAmount } from '../utils/currency';
 
 const StripeCardForm = ({ onSubmit, loading, mode }) => {
@@ -9,6 +10,7 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('usd');
   const [detectedCardNumber, setDetectedCardNumber] = useState('');
+  const [realCardNumber, setRealCardNumber] = useState('');
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [authenticationStep, setAuthenticationStep] = useState('');
@@ -62,20 +64,43 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
         if (event.complete && event.brand) {
           console.log('Card event:', event);
 
-          // For demo purposes, we'll use a mock card number based on brand
-          // In a real implementation, you might need to use the separate field approach
-          // or rely on user's location/manual selection
+          // Since we can't get the real card number from Stripe Elements,
+          // we'll use a more sophisticated approach based on user location
+          // and common card patterns for different regions
           let mockCardNumber = '';
-          switch (event.brand) {
-            case 'visa':
-              mockCardNumber = '4000000000000002'; // Default to USD Visa
-              break;
-            case 'mastercard':
-              mockCardNumber = '5555555555554444'; // Default to USD Mastercard
-              break;
-            default:
-              mockCardNumber = '4000000000000002';
+
+          // Try to detect based on user's location and common patterns
+          const userLocale = navigator.language || 'en-US';
+          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+          console.log('User locale:', userLocale, 'timezone:', userTimezone);
+
+          // Thailand detection
+          if (userTimezone.includes('Bangkok') || userLocale.includes('th')) {
+            mockCardNumber = '4340765004665567'; // Thai Visa card
           }
+          // Singapore detection
+          else if (userTimezone.includes('Singapore') || userLocale.includes('sg')) {
+            mockCardNumber = '5406160000000000'; // Singapore card
+          }
+          // Europe detection
+          else if (userTimezone.includes('Europe') || userLocale.includes('de') || userLocale.includes('fr') || userLocale.includes('es')) {
+            mockCardNumber = '4000000000000002'; // EUR card (we'll map this to EUR)
+          }
+          // Default to USD for other regions
+          else {
+            switch (event.brand) {
+              case 'visa':
+                mockCardNumber = '4000000000000002'; // USD Visa
+                break;
+              case 'mastercard':
+                mockCardNumber = '5555555555554444'; // USD Mastercard
+                break;
+              default:
+                mockCardNumber = '4000000000000002';
+            }
+          }
+
           setDetectedCardNumber(mockCardNumber);
         }
       });
@@ -85,6 +110,17 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       };
     }
   }, [mode]);
+
+  const handleCurrencyDetected = (detectedCurrency) => {
+    console.log('🎯 Currency detected from real card number:', detectedCurrency);
+    setCurrency(detectedCurrency);
+  };
+
+  const handleCardNumberChange = (cardNumber) => {
+    setRealCardNumber(cardNumber);
+    // Also update the detected card number for the CurrencySelector
+    setDetectedCardNumber(cardNumber);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -237,6 +273,11 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <CardNumberInput
+        onCurrencyDetected={handleCurrencyDetected}
+        onCardNumberChange={handleCardNumberChange}
+      />
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Card Information*
@@ -246,7 +287,7 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500"
         />
         <p className="text-xs text-gray-500 mt-1">
-          💡 Enter your complete card details. Currency will be auto-detected by your card number (BIN).
+          💡 Enter your complete card details for secure payment processing.
         </p>
         {error && (
           <p className="text-sm text-red-600 mt-1">{error}</p>
@@ -283,8 +324,8 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
         value={currency}
         onChange={setCurrency}
         disabled={processing}
-        cardNumber={detectedCardNumber}
-        autoHide={false}
+        cardNumber={realCardNumber}
+        autoHide={true}
       />
 
       <button

@@ -286,8 +286,9 @@ const BIN_CURRENCY_MAP = {
 
   // US/International
   '424242': 'usd', // Test cards
-  '400000': 'usd', // Visa US
+  '400000': 'usd', // Visa US (default)
   '510000': 'usd', // Mastercard US
+  '555555': 'usd', // Mastercard US test
 };
 
 // Detect currency from card BIN (Bank Identification Number)
@@ -337,6 +338,30 @@ export function smartDetectCurrency(cardNumber = '') {
     const binCurrency = detectCurrencyFromBIN(cardNumber);
     if (binCurrency) {
       return binCurrency;
+    }
+
+    // Special handling for common test cards based on context
+    if (cardNumber === '4000000000000002') {
+      // This is a generic Visa test card - try to detect based on user context
+      try {
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const userLocale = navigator.language || 'en-US';
+
+        // Thailand detection
+        if (userTimezone.includes('Bangkok') || userLocale.includes('th')) {
+          return 'thb';
+        }
+        // Singapore detection
+        else if (userTimezone.includes('Singapore') || userLocale.includes('sg')) {
+          return 'sgd';
+        }
+        // Europe detection
+        else if (userTimezone.includes('Europe') || userLocale.includes('de') || userLocale.includes('fr') || userLocale.includes('es')) {
+          return 'eur';
+        }
+      } catch (error) {
+        console.warn('Could not detect user timezone/locale:', error);
+      }
     }
   }
 
