@@ -248,8 +248,8 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       // Declare variables for payment intents
       let paymentIntent, mainPaymentIntent;
 
-      // Direct deposit payment (simplified approach)
-      if (false) { // Temporarily disable verification logic
+      // Check if this is a verification payment (step 1) or main deposit (step 2)
+      if (result.verification) {
         setAuthenticationStep('Confirming verification payment (3D Secure authentication may be required)...');
 
         // Step 1: Confirm verification payment

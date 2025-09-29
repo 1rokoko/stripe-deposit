@@ -165,40 +165,41 @@ export default async function handler(req, res) {
     // Note: We don't need to attach payment method to customer for on-session payments
     // The payment method will be used directly in the payment intent
 
-    // Create main deposit payment intent (manual capture for hold)
-    console.log('💳 Creating deposit payment intent with manual capture...');
-
-    const paymentIntentParams = {
-      amount: amountInCents,
+    // Step 1: Create verification payment intent (small amount, automatic capture)
+    console.log('💳 Creating verification payment intent...');
+    const verificationAmount = normalizedCurrency === 'thb' ? 100 : 300; // ~3 USD equivalent
+    const verificationParams = {
+      amount: verificationAmount,
       currency: normalizedCurrency,
       payment_method: paymentMethodId,
       customer: stripeCustomer.id,
-      capture_method: 'manual', // Manual capture for deposits
-      confirmation_method: 'automatic', // Automatic confirmation for client-side 3D Secure
-      description: `Deposit hold ${amountInCents / 100} ${normalizedCurrency.toUpperCase()}`,
+      capture_method: 'automatic', // Automatic capture for verification
+      confirmation_method: 'automatic',
+      description: `Card verification charge ${verificationAmount / 100} ${normalizedCurrency.toUpperCase()}`,
       metadata: {
         customerId: stripeCustomer.id,
         original_customer_id: customerId,
         created_via: 'api',
-        purpose: 'deposit_hold',
+        purpose: 'verification_charge',
+        main_deposit_amount: amountInCents,
         mode
       }
     };
 
-    console.log('🔧 Payment intent parameters:', {
-      amount: paymentIntentParams.amount,
-      currency: paymentIntentParams.currency,
-      customer: paymentIntentParams.customer,
-      payment_method: paymentIntentParams.payment_method,
-      capture_method: paymentIntentParams.capture_method,
-      confirmation_method: paymentIntentParams.confirmation_method
+    console.log('🔧 Verification payment intent parameters:', {
+      amount: verificationParams.amount,
+      currency: verificationParams.currency,
+      customer: verificationParams.customer,
+      payment_method: verificationParams.payment_method,
+      capture_method: verificationParams.capture_method,
+      confirmation_method: verificationParams.confirmation_method
     });
 
-    let paymentIntent;
+    let verificationIntent;
     try {
-      paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+      verificationIntent = await stripe.paymentIntents.create(verificationParams);
     } catch (stripeError) {
-      console.error('❌ Payment intent creation failed:', {
+      console.error('❌ Verification payment intent creation failed:', {
         message: stripeError.message,
         type: stripeError.type,
         code: stripeError.code,
@@ -206,7 +207,7 @@ export default async function handler(req, res) {
       });
 
       return res.status(500).json({
-        error: 'Payment intent creation failed',
+        error: 'Verification payment intent creation failed',
         message: stripeError.message,
         details: {
           type: stripeError.type,
@@ -216,25 +217,28 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('✅ Payment intent created successfully:', {
-      id: paymentIntent.id,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      status: paymentIntent.status,
-      capture_method: paymentIntent.capture_method,
-      client_secret: paymentIntent.client_secret ? 'present' : 'missing'
+    console.log('✅ Verification payment intent created successfully:', {
+      id: verificationIntent.id,
+      amount: verificationIntent.amount,
+      currency: verificationIntent.currency,
+      status: verificationIntent.status,
+      capture_method: verificationIntent.capture_method,
+      client_secret: verificationIntent.client_secret ? 'present' : 'missing'
     });
 
+    // Return verification payment intent for client-side confirmation
     return res.status(200).json({
       success: true,
+      verification: true, // Flag to indicate this is a verification payment
       paymentIntent: {
-        id: paymentIntent.id,
-        client_secret: paymentIntent.client_secret,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency,
-        status: paymentIntent.status,
-        capture_method: paymentIntent.capture_method
+        id: verificationIntent.id,
+        client_secret: verificationIntent.client_secret,
+        amount: verificationIntent.amount,
+        currency: verificationIntent.currency,
+        status: verificationIntent.status,
+        capture_method: verificationIntent.capture_method
       },
+      mainDepositAmount: amountInCents, // Store main deposit amount for later
       customer: {
         id: stripeCustomer.id,
         email: stripeCustomer.email
@@ -242,10 +246,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('❌ Payment intent creation failed:', error);
-    
-    return res.status(500).json({ 
-      error: 'Payment intent creation failed',
+    console.error('❌ Verification payment intent creation failed:', error);
+
+    return res.status(500).json({
+      error: 'Verification payment intent creation failed',
       message: error.message,
       type: error.type || 'api_error'
     });
