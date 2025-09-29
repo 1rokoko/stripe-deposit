@@ -70,7 +70,7 @@ export default async function handler(req, res) {
           timestamp: new Date().toISOString()
         }
       });
-      
+
       paymentIntentResult = {
         success: true,
         id: paymentIntent.id,
@@ -90,6 +90,71 @@ export default async function handler(req, res) {
       console.error('❌ Payment intent creation failed:', paymentIntentResult);
     }
 
+    // Test 3: If payment method ID provided, test with it
+    let paymentMethodTest;
+    const testPaymentMethodId = req.query.test_payment_method;
+    if (testPaymentMethodId) {
+      console.log('🧪 Test 3: Testing with payment method:', testPaymentMethodId);
+      try {
+        // First retrieve the payment method
+        const paymentMethod = await stripe.paymentMethods.retrieve(testPaymentMethodId);
+        console.log('✅ Payment method retrieved:', {
+          id: paymentMethod.id,
+          type: paymentMethod.type,
+          card: paymentMethod.card ? {
+            brand: paymentMethod.card.brand,
+            last4: paymentMethod.card.last4
+          } : null
+        });
+
+        // Create customer
+        const customer = await stripe.customers.create({
+          metadata: { test: 'debug-endpoint' }
+        });
+
+        // Create payment intent with payment method
+        const paymentIntentWithPM = await stripe.paymentIntents.create({
+          amount: 500, // $5.00
+          currency: 'usd',
+          payment_method: testPaymentMethodId,
+          customer: customer.id,
+          capture_method: 'automatic',
+          confirmation_method: 'automatic',
+          metadata: {
+            test: 'stripe-api-debug-with-pm',
+            timestamp: new Date().toISOString()
+          }
+        });
+
+        paymentMethodTest = {
+          success: true,
+          paymentMethod: {
+            id: paymentMethod.id,
+            type: paymentMethod.type,
+            card: paymentMethod.card
+          },
+          customer: customer.id,
+          paymentIntent: {
+            id: paymentIntentWithPM.id,
+            status: paymentIntentWithPM.status,
+            amount: paymentIntentWithPM.amount,
+            currency: paymentIntentWithPM.currency
+          }
+        };
+        console.log('✅ Payment intent with payment method successful:', paymentMethodTest);
+      } catch (error) {
+        paymentMethodTest = {
+          success: false,
+          error: error.message,
+          type: error.type,
+          code: error.code,
+          decline_code: error.decline_code,
+          param: error.param
+        };
+        console.error('❌ Payment intent with payment method failed:', paymentMethodTest);
+      }
+    }
+
     const result = {
       timestamp: new Date().toISOString(),
       mode,
@@ -99,7 +164,8 @@ export default async function handler(req, res) {
       },
       tests: {
         customers: customersResult,
-        paymentIntent: paymentIntentResult
+        paymentIntent: paymentIntentResult,
+        paymentMethodTest: paymentMethodTest || null
       }
     };
 
