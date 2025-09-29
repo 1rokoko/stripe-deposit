@@ -37,12 +37,16 @@ export default async function handler(req, res) {
     const liveKey = process.env.STRIPE_SECRET_KEY_LIVE || process.env.STRIPE_SECRET_KEY; // Fallback to test key for demo
 
     const stripeKey = mode === 'live' ? liveKey : testKey;
-    
+
     console.log('🔑 Stripe key configuration:', {
       mode,
       testKeyExists: !!testKey,
+      testKeyPrefix: testKey ? testKey.substring(0, 8) + '...' : 'none',
       liveKeyExists: !!liveKey,
-      selectedKeyExists: !!stripeKey
+      liveKeyPrefix: liveKey ? liveKey.substring(0, 8) + '...' : 'none',
+      selectedKeyExists: !!stripeKey,
+      selectedKeyPrefix: stripeKey ? stripeKey.substring(0, 8) + '...' : 'none',
+      allEnvVars: Object.keys(process.env).filter(key => key.includes('STRIPE')).sort()
     });
 
     if (!stripeKey) {
