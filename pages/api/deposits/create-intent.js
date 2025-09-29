@@ -162,24 +162,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // Attach payment method to customer if not already attached
-    console.log('🔗 Attaching payment method to customer...');
-    try {
-      await stripe.paymentMethods.attach(paymentMethodId, {
-        customer: stripeCustomer.id,
-      });
-      console.log('✅ Payment method attached to customer');
-    } catch (attachError) {
-      // If already attached, that's fine
-      if (attachError.code !== 'resource_already_exists') {
-        console.error('❌ Payment method attachment failed:', attachError);
-        return res.status(400).json({
-          error: 'Payment method attachment failed',
-          message: attachError.message
-        });
-      }
-      console.log('✅ Payment method already attached to customer');
-    }
+    // Note: We don't need to attach payment method to customer for on-session payments
+    // The payment method will be used directly in the payment intent
 
     // Create main deposit payment intent (manual capture for hold)
     console.log('💳 Creating deposit payment intent with manual capture...');
@@ -194,7 +178,7 @@ export default async function handler(req, res) {
       payment_method: paymentMethodId,
       customer: stripeCustomer.id,
       capture_method: 'automatic', // Automatic capture for verification
-      confirmation_method: 'automatic',
+      confirmation_method: 'manual', // Manual confirmation for client-side 3D Secure
       description: `Card verification for deposit (will be refunded)`,
       metadata: {
         customerId: stripeCustomer.id,
