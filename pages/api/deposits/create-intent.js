@@ -174,7 +174,7 @@ export default async function handler(req, res) {
       payment_method: paymentMethodId,
       customer: stripeCustomer.id,
       capture_method: 'manual', // Manual capture for deposits
-      confirmation_method: 'manual', // Manual confirmation for client-side 3D Secure
+      confirmation_method: 'automatic', // Automatic confirmation for client-side 3D Secure
       description: `Deposit hold ${amountInCents / 100} ${normalizedCurrency.toUpperCase()}`,
       metadata: {
         customerId: stripeCustomer.id,
