@@ -168,9 +168,8 @@ export default async function handler(req, res) {
       currency: normalizedCurrency,
       payment_method: paymentMethodId,
       customer: stripeCustomer.id, // Use real Stripe customer ID
-      capture_method: 'automatic', // Automatically capture the payment
+      capture_method: 'manual', // Manual capture for deposits (authorize first, capture later)
       confirmation_method: 'automatic', // Allow client-side confirmation with publishable key
-      return_url: `${req.headers.origin || 'https://stripe-deposit.vercel.app'}/deposit-status`,
       metadata: {
         customerId: stripeCustomer.id,
         original_customer_id: customerId,
