@@ -162,6 +162,25 @@ export default async function handler(req, res) {
       });
     }
 
+    // Attach payment method to customer if not already attached
+    console.log('🔗 Attaching payment method to customer...');
+    try {
+      await stripe.paymentMethods.attach(paymentMethodId, {
+        customer: stripeCustomer.id,
+      });
+      console.log('✅ Payment method attached to customer');
+    } catch (attachError) {
+      // If already attached, that's fine
+      if (attachError.code !== 'resource_already_exists') {
+        console.error('❌ Payment method attachment failed:', attachError);
+        return res.status(400).json({
+          error: 'Payment method attachment failed',
+          message: attachError.message
+        });
+      }
+      console.log('✅ Payment method already attached to customer');
+    }
+
     // Create main deposit payment intent (manual capture for hold)
     console.log('💳 Creating deposit payment intent with manual capture...');
     // STEP 1: Create verification payment intent (small amount, automatic capture)
@@ -191,7 +210,9 @@ export default async function handler(req, res) {
       amount: verificationParams.amount,
       currency: verificationParams.currency,
       customer: verificationParams.customer,
-      capture_method: verificationParams.capture_method
+      payment_method: verificationParams.payment_method,
+      capture_method: verificationParams.capture_method,
+      confirmation_method: verificationParams.confirmation_method
     });
 
     let verificationIntent;
