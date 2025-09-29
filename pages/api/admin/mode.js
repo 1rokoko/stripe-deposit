@@ -15,12 +15,15 @@ export default async function handler(req, res) {
     });
   }
 
-  // Check if live keys are configured
+  // Check if live keys are configured (with fallback to regular keys)
+  const liveSecretKey = process.env.STRIPE_SECRET_KEY_LIVE || process.env.STRIPE_SECRET_KEY;
+  const livePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
   const hasLiveKeys = !!(
-    process.env.STRIPE_SECRET_KEY_LIVE &&
-    process.env.STRIPE_SECRET_KEY_LIVE.startsWith('sk_live_') &&
-    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE &&
-    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE.startsWith('pk_live_')
+    liveSecretKey &&
+    liveSecretKey.startsWith('sk_live_') &&
+    livePublishableKey &&
+    livePublishableKey.startsWith('pk_live_')
   );
 
   if (req.method === 'GET') {

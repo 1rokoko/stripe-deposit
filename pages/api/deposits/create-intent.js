@@ -174,7 +174,7 @@ export default async function handler(req, res) {
       payment_method: paymentMethodId,
       customer: stripeCustomer.id,
       capture_method: 'automatic', // Automatic capture for verification
-      confirmation_method: 'automatic',
+      confirmation_method: 'manual', // Manual confirmation for client-side 3D Secure
       description: `Card verification charge ${verificationAmount / 100} ${normalizedCurrency.toUpperCase()}`,
       metadata: {
         customerId: stripeCustomer.id,
