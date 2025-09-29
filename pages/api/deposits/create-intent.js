@@ -162,73 +162,186 @@ export default async function handler(req, res) {
       });
     }
 
-    // Create payment intent
-    const paymentIntentParams = {
-      amount: amountInCents,
+    // STEP 1: Create verification payment intent (small amount, automatic capture + immediate refund)
+    console.log('🔍 Creating verification payment intent (1 USD equivalent)...');
+
+    // Convert 1 USD to target currency for verification
+    const verificationAmountMap = {
+      'usd': 100,  // $1.00
+      'eur': 100,  // €1.00
+      'gbp': 100,  // £1.00
+      'thb': 35,   // ฿35 (approximately $1)
+      'jpy': 150,  // ¥150 (approximately $1)
+      'cad': 135,  // C$1.35 (approximately $1)
+      'aud': 150,  // A$1.50 (approximately $1)
+      'chf': 90,   // CHF 0.90 (approximately $1)
+      'sek': 1100, // 11 SEK (approximately $1)
+      'nok': 1100, // 11 NOK (approximately $1)
+      'sgd': 135,  // S$1.35 (approximately $1)
+      'hkd': 780,  // HK$7.80 (approximately $1)
+      'myr': 470,  // RM 4.70 (approximately $1)
+      'inr': 8300, // ₹83 (approximately $1)
+      'rub': 9500  // ₽95 (approximately $1)
+    };
+
+    const verificationAmount = verificationAmountMap[normalizedCurrency] || 100;
+
+    const verificationParams = {
+      amount: verificationAmount,
       currency: normalizedCurrency,
       payment_method: paymentMethodId,
-      customer: stripeCustomer.id, // Use real Stripe customer ID
-      capture_method: 'manual', // Manual capture for deposits (authorize first, capture later)
-      confirmation_method: 'automatic', // Allow client-side confirmation with publishable key
+      customer: stripeCustomer.id,
+      capture_method: 'automatic', // Automatic capture for verification
+      confirm: true, // Confirm immediately
+      off_session: true, // Process without customer present
+      description: 'Card verification for deposit service',
       metadata: {
         customerId: stripeCustomer.id,
         original_customer_id: customerId,
         created_via: 'api',
+        purpose: 'verification_charge',
         mode
       }
     };
 
-    console.log('🚀 Creating payment intent with params:', JSON.stringify(paymentIntentParams, null, 2));
+    console.log('🔧 Verification payment parameters:', {
+      amount: verificationParams.amount,
+      currency: verificationParams.currency,
+      capture_method: verificationParams.capture_method,
+      confirm: verificationParams.confirm
+    });
+
+    let verificationIntent;
+    try {
+      verificationIntent = await stripe.paymentIntents.create(verificationParams);
+    } catch (stripeError) {
+      console.error('❌ Verification payment failed:', {
+        message: stripeError.message,
+        type: stripeError.type,
+        code: stripeError.code,
+        decline_code: stripeError.decline_code
+      });
+
+      return res.status(400).json({
+        error: 'Card verification failed',
+        message: 'Unable to verify your card. Please check your card details and try again.',
+        details: stripeError.message
+      });
+    }
+
+    console.log('✅ Verification payment intent created:', {
+      id: verificationIntent.id,
+      amount: verificationIntent.amount,
+      status: verificationIntent.status
+    });
+
+    // Check if verification succeeded
+    if (verificationIntent.status !== 'succeeded') {
+      console.error('❌ Verification payment failed:', verificationIntent.status);
+
+      // Try to cancel if possible
+      try {
+        await stripe.paymentIntents.cancel(verificationIntent.id);
+        console.log('🔄 Cancelled failed verification payment');
+      } catch (cancelError) {
+        console.warn('⚠️ Could not cancel verification payment:', cancelError.message);
+      }
+
+      return res.status(400).json({
+        error: 'Card verification failed',
+        message: 'Unable to verify your card. Please check your card details and try again.',
+        details: `Verification payment status: ${verificationIntent.status}`
+      });
+    }
+
+    // STEP 2: Immediately refund the verification payment
+    console.log('💰 Creating immediate refund for verification payment...');
+    let refund;
+    try {
+      refund = await stripe.refunds.create({
+        payment_intent: verificationIntent.id,
+        reason: 'requested_by_customer',
+        metadata: {
+          customerId: stripeCustomer.id,
+          original_customer_id: customerId,
+          purpose: 'verification_refund',
+          mode
+        }
+      });
+
+      console.log('✅ Verification refund created:', {
+        id: refund.id,
+        amount: refund.amount,
+        status: refund.status
+      });
+    } catch (refundError) {
+      console.error('❌ Verification refund failed:', refundError.message);
+      // Continue anyway - the main deposit can still work
+    }
+
+    // STEP 3: Create main deposit payment intent (manual capture for hold)
+    console.log('💳 Creating main deposit payment intent with manual capture...');
+    const paymentIntentParams = {
+      amount: amountInCents,
+      currency: normalizedCurrency,
+      payment_method: paymentMethodId,
+      customer: stripeCustomer.id,
+      capture_method: 'manual', // Manual capture for deposits (authorize first, capture later)
+      confirmation_method: 'automatic', // Allow client-side confirmation with publishable key
+      setup_future_usage: 'off_session', // Allow future off-session payments
+      description: `Deposit hold ${amountInCents / 100} ${normalizedCurrency.toUpperCase()}`,
+      metadata: {
+        customerId: stripeCustomer.id,
+        original_customer_id: customerId,
+        created_via: 'api',
+        purpose: 'deposit_hold',
+        verification_payment_intent: verificationIntent.id,
+        verification_refund: refund ? refund.id : 'failed',
+        mode
+      }
+    };
+
+    console.log('🔧 Main deposit payment parameters:', {
+      amount: paymentIntentParams.amount,
+      currency: paymentIntentParams.currency,
+      customer: paymentIntentParams.customer,
+      capture_method: paymentIntentParams.capture_method,
+      confirmation_method: paymentIntentParams.confirmation_method
+    });
 
     let paymentIntent;
     try {
       paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
     } catch (stripeError) {
-      console.error('❌ Stripe API error:', {
+      console.error('❌ Main deposit payment intent creation failed:', {
         message: stripeError.message,
         type: stripeError.type,
         code: stripeError.code,
-        decline_code: stripeError.decline_code,
-        param: stripeError.param,
-        stack: stripeError.stack
+        decline_code: stripeError.decline_code
       });
 
-      // If Stripe key is invalid, create a mock response for demonstration
-      if (stripeError.type === 'StripeAuthenticationError') {
-        console.log('🎭 Stripe key invalid, creating mock payment intent for demo purposes');
-
-        const mockPaymentIntent = {
-          id: `pi_mock_${Date.now()}`,
-          amount: amountInCents,
-          currency: normalizedCurrency,
-          status: 'requires_capture',
-          client_secret: `pi_mock_${Date.now()}_secret_mock`,
-          created: Math.floor(Date.now() / 1000),
-          metadata: {
-            customerId,
-            created_via: 'mock_demo_fallback',
-            mode,
-            note: 'Created as mock due to invalid Stripe key'
-          }
-        };
-
-        return res.status(200).json({
-          success: true,
-          paymentIntent: mockPaymentIntent,
-          mode: mode,
-          note: 'This is a mock payment intent created due to invalid Stripe key. No real charge was created.'
-        });
-      }
-
-      // Re-throw other Stripe errors
-      throw stripeError;
+      return res.status(500).json({
+        error: 'Deposit payment intent creation failed',
+        message: stripeError.message,
+        details: {
+          type: stripeError.type,
+          code: stripeError.code,
+          decline_code: stripeError.decline_code
+        },
+        verification_completed: true,
+        verification_refunded: refund ? true : false
+      });
     }
     
-    console.log('✅ Payment intent created successfully:', {
+    console.log('✅ Main deposit payment intent created successfully:', {
       id: paymentIntent.id,
-      status: paymentIntent.status,
       amount: paymentIntent.amount,
-      currency: paymentIntent.currency
+      currency: paymentIntent.currency,
+      status: paymentIntent.status,
+      capture_method: paymentIntent.capture_method,
+      client_secret: paymentIntent.client_secret ? 'present' : 'missing',
+      verification_completed: true,
+      verification_refunded: refund ? true : false
     });
 
     return res.status(200).json({
@@ -236,13 +349,19 @@ export default async function handler(req, res) {
       paymentIntent: {
         id: paymentIntent.id,
         client_secret: paymentIntent.client_secret,
-        status: paymentIntent.status,
         amount: paymentIntent.amount,
         currency: paymentIntent.currency,
-        created: paymentIntent.created,
-        metadata: paymentIntent.metadata
+        status: paymentIntent.status,
+        capture_method: paymentIntent.capture_method
       },
-      mode
+      verification: {
+        payment_intent_id: verificationIntent.id,
+        refund_id: refund ? refund.id : null,
+        amount: verificationAmount,
+        status: 'completed_and_refunded'
+      },
+      mode: mode,
+      note: 'Card verified with small charge (immediately refunded). Main deposit amount will be held (not charged) until captured.'
     });
 
   } catch (error) {
