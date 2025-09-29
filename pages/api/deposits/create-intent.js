@@ -138,6 +138,30 @@ export default async function handler(req, res) {
       console.log('✅ Created new customer after error:', stripeCustomer.id);
     }
 
+    // First, let's verify the payment method exists and is valid
+    console.log('🔍 Verifying payment method:', paymentMethodId);
+    let paymentMethod;
+    try {
+      paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+      console.log('✅ Payment method retrieved:', {
+        id: paymentMethod.id,
+        type: paymentMethod.type,
+        card: paymentMethod.card ? {
+          brand: paymentMethod.card.brand,
+          last4: paymentMethod.card.last4,
+          exp_month: paymentMethod.card.exp_month,
+          exp_year: paymentMethod.card.exp_year
+        } : null
+      });
+    } catch (pmError) {
+      console.error('❌ Payment method retrieval failed:', pmError);
+      return res.status(400).json({
+        error: 'Invalid payment method',
+        message: `Payment method ${paymentMethodId} not found or invalid`,
+        details: pmError.message
+      });
+    }
+
     // Create payment intent
     const paymentIntentParams = {
       amount: amountInCents,
@@ -161,7 +185,14 @@ export default async function handler(req, res) {
     try {
       paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
     } catch (stripeError) {
-      console.error('❌ Stripe API error:', stripeError);
+      console.error('❌ Stripe API error:', {
+        message: stripeError.message,
+        type: stripeError.type,
+        code: stripeError.code,
+        decline_code: stripeError.decline_code,
+        param: stripeError.param,
+        stack: stripeError.stack
+      });
 
       // If Stripe key is invalid, create a mock response for demonstration
       if (stripeError.type === 'StripeAuthenticationError') {
