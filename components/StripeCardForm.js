@@ -245,62 +245,161 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
         return;
       }
 
-      setAuthenticationStep('Confirming payment (3D Secure authentication may be required)...');
+      // Declare variables for payment intents
+      let paymentIntent, mainPaymentIntent;
 
-      // Confirm payment with 3D Secure authentication support
-      console.log('🔄 Confirming payment with 3D Secure support...');
-      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-        result.paymentIntent.client_secret
-      );
+      // Check if this is a verification payment (step 1) or main deposit (step 2)
+      if (result.verification) {
+        setAuthenticationStep('Confirming verification payment (3D Secure authentication may be required)...');
 
-      if (confirmError) {
-        console.error('❌ Payment confirmation failed:', confirmError);
+        // Step 1: Confirm verification payment
+        console.log('🔄 Confirming verification payment with 3D Secure support...');
+        const { error: confirmError, paymentIntent: verificationPaymentIntent } = await stripe.confirmCardPayment(
+          result.paymentIntent.client_secret
+        );
+        paymentIntent = verificationPaymentIntent;
 
-        // Handle specific 3D Secure authentication errors
-        if (confirmError.type === 'card_error') {
-          if (confirmError.code === 'authentication_required') {
-            setError('Authentication required. Please complete 3D Secure verification with your bank.');
-          } else if (confirmError.code === 'card_declined') {
-            setError(`Card declined: ${confirmError.message}`);
+        if (confirmError) {
+          console.error('❌ Verification payment confirmation failed:', confirmError);
+          if (confirmError.type === 'card_error') {
+            if (confirmError.code === 'authentication_required') {
+              setError('Authentication required. Please complete 3D Secure verification with your bank.');
+            } else if (confirmError.code === 'card_declined') {
+              setError(`Card declined: ${confirmError.message}`);
+            } else {
+              setError(confirmError.message);
+            }
           } else {
             setError(confirmError.message);
           }
-        } else {
-          setError(confirmError.message);
+          setProcessing(false);
+          setAuthenticationStep('');
+          return;
         }
-        setProcessing(false);
-        setAuthenticationStep('');
-        return;
+
+        console.log('✅ Verification payment confirmed successfully:', paymentIntent.status);
+        setAuthenticationStep('Verification successful! Creating main deposit...');
+
+        // Step 2: Create main deposit after successful verification
+        console.log('🔄 Creating main deposit after verification...');
+        const mainDepositResponse = await fetch('/api/deposits/create-main-deposit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Stripe-Mode': mode
+          },
+          body: JSON.stringify({
+            amount: parseFloat(amount),
+            currency: currency,
+            customerId: customerId,
+            paymentMethodId: paymentMethod.id,
+            verificationPaymentIntentId: paymentIntent.id
+          })
+        });
+
+        const mainDepositResult = await mainDepositResponse.json();
+        console.log('📥 Main deposit API response:', { status: mainDepositResponse.status, result: mainDepositResult });
+
+        if (!mainDepositResponse.ok) {
+          console.error('❌ Main deposit creation failed:', { status: mainDepositResponse.status, error: mainDepositResult.error });
+          setError(mainDepositResult.error || 'Failed to create main deposit');
+          setProcessing(false);
+          setAuthenticationStep('');
+          return;
+        }
+
+        setAuthenticationStep('Confirming main deposit (3D Secure authentication may be required)...');
+
+        // Confirm main deposit payment
+        console.log('🔄 Confirming main deposit with 3D Secure support...');
+        const { error: mainConfirmError, paymentIntent: mainDepositPaymentIntent } = await stripe.confirmCardPayment(
+          mainDepositResult.paymentIntent.client_secret
+        );
+        mainPaymentIntent = mainDepositPaymentIntent;
+
+        if (mainConfirmError) {
+          console.error('❌ Main deposit confirmation failed:', mainConfirmError);
+          if (mainConfirmError.type === 'card_error') {
+            if (mainConfirmError.code === 'authentication_required') {
+              setError('Authentication required for main deposit. Please complete 3D Secure verification with your bank.');
+            } else if (mainConfirmError.code === 'card_declined') {
+              setError(`Main deposit declined: ${mainConfirmError.message}`);
+            } else {
+              setError(mainConfirmError.message);
+            }
+          } else {
+            setError(mainConfirmError.message);
+          }
+          setProcessing(false);
+          setAuthenticationStep('');
+          return;
+        }
+
+        setAuthenticationStep('Main deposit confirmed successfully!');
+        console.log('✅ Main deposit confirmed successfully:', mainPaymentIntent.status);
+
+        // Use main deposit payment intent for final processing
+        const finalPaymentIntent = mainPaymentIntent;
+      } else {
+        // Legacy single-step process
+        setAuthenticationStep('Confirming payment (3D Secure authentication may be required)...');
+
+        console.log('🔄 Confirming payment with 3D Secure support...');
+        const { error: confirmError, paymentIntent: singlePaymentIntent } = await stripe.confirmCardPayment(
+          result.paymentIntent.client_secret
+        );
+        paymentIntent = singlePaymentIntent;
+
+        if (confirmError) {
+          console.error('❌ Payment confirmation failed:', confirmError);
+          if (confirmError.type === 'card_error') {
+            if (confirmError.code === 'authentication_required') {
+              setError('Authentication required. Please complete 3D Secure verification with your bank.');
+            } else if (confirmError.code === 'card_declined') {
+              setError(`Card declined: ${confirmError.message}`);
+            } else {
+              setError(confirmError.message);
+            }
+          } else {
+            setError(confirmError.message);
+          }
+          setProcessing(false);
+          setAuthenticationStep('');
+          return;
+        }
+
+        setAuthenticationStep('Payment confirmed successfully!');
+        console.log('✅ Payment confirmed successfully:', paymentIntent.status);
       }
 
-      setAuthenticationStep('Payment confirmed successfully!');
-      console.log('✅ Payment confirmed successfully:', paymentIntent.status);
+      // Get the final payment intent (either from two-step or single-step process)
+      const finalPaymentIntent = result.verification ? mainPaymentIntent : paymentIntent;
 
       // Check payment intent status
-      if (paymentIntent.status === 'requires_capture') {
+      if (finalPaymentIntent.status === 'requires_capture') {
         // Payment authorized successfully (manual capture)
         console.log('✅ Payment authorized - ready for capture');
-        setAuthenticationStep('Payment authorized successfully!');
-      } else if (paymentIntent.status === 'succeeded') {
+        setAuthenticationStep('Deposit authorized successfully! Funds are held securely.');
+      } else if (finalPaymentIntent.status === 'succeeded') {
         // Payment completed successfully
         console.log('✅ Payment completed successfully');
-        setAuthenticationStep('Payment completed successfully!');
-      } else if (paymentIntent.status === 'requires_action') {
+        setAuthenticationStep('Deposit completed successfully!');
+      } else if (finalPaymentIntent.status === 'requires_action') {
         // This shouldn't happen after confirmCardPayment, but handle it
         console.warn('⚠️ Payment still requires action after confirmation');
         setError('Payment requires additional authentication. Please try again.');
         setProcessing(false);
         setAuthenticationStep('');
         return;
-      } else if (paymentIntent.status === 'canceled') {
+      } else if (finalPaymentIntent.status === 'canceled') {
         console.warn('⚠️ Payment was canceled');
         setError('Payment was canceled. Please try again.');
         setProcessing(false);
         setAuthenticationStep('');
         return;
       } else {
-        console.warn('⚠️ Unexpected payment status:', paymentIntent.status);
-        setError(`Unexpected payment status: ${paymentIntent.status}. Please contact support.`);
+        console.warn('⚠️ Unexpected payment status:', finalPaymentIntent.status);
+        setError(`Unexpected payment status: ${finalPaymentIntent.status}. Please contact support.`);
         setProcessing(false);
         setAuthenticationStep('');
         return;
@@ -311,9 +410,10 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
         amount: amountValue,
         currency: currency,
         paymentMethodId: paymentMethod.id,
-        paymentIntent: paymentIntent,
+        paymentIntent: finalPaymentIntent,
         success: true,
-        status: paymentIntent.status
+        status: finalPaymentIntent.status,
+        verification: result.verification || false
       });
 
       setProcessing(false);

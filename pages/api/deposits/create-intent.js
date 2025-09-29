@@ -164,37 +164,41 @@ export default async function handler(req, res) {
 
     // Create main deposit payment intent (manual capture for hold)
     console.log('💳 Creating deposit payment intent with manual capture...');
-    const paymentIntentParams = {
-      amount: amountInCents,
+    // STEP 1: Create verification payment intent (small amount, automatic capture)
+    // This verifies the card works and will be immediately refunded
+    const verificationAmount = normalizedCurrency === 'thb' ? 100 : 300; // 1 THB or 3 USD equivalent
+    console.log('💳 Creating verification payment intent...');
+
+    const verificationParams = {
+      amount: verificationAmount,
       currency: normalizedCurrency,
       payment_method: paymentMethodId,
       customer: stripeCustomer.id,
-      capture_method: 'manual', // Manual capture for deposits (authorize first, capture later)
-      confirmation_method: 'automatic', // Allow client-side confirmation with publishable key
-      setup_future_usage: 'off_session', // Allow future off-session payments
-      description: `Deposit hold ${amountInCents / 100} ${normalizedCurrency.toUpperCase()}`,
+      capture_method: 'automatic', // Automatic capture for verification
+      confirmation_method: 'automatic',
+      description: `Card verification for deposit (will be refunded)`,
       metadata: {
         customerId: stripeCustomer.id,
         original_customer_id: customerId,
         created_via: 'api',
-        purpose: 'deposit_hold',
+        purpose: 'verification_charge',
+        main_deposit_amount: amountInCents,
         mode
       }
     };
 
-    console.log('🔧 Deposit payment parameters:', {
-      amount: paymentIntentParams.amount,
-      currency: paymentIntentParams.currency,
-      customer: paymentIntentParams.customer,
-      capture_method: paymentIntentParams.capture_method,
-      confirmation_method: paymentIntentParams.confirmation_method
+    console.log('🔧 Verification payment parameters:', {
+      amount: verificationParams.amount,
+      currency: verificationParams.currency,
+      customer: verificationParams.customer,
+      capture_method: verificationParams.capture_method
     });
 
-    let paymentIntent;
+    let verificationIntent;
     try {
-      paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+      verificationIntent = await stripe.paymentIntents.create(verificationParams);
     } catch (stripeError) {
-      console.error('❌ Deposit payment intent creation failed:', {
+      console.error('❌ Verification payment intent creation failed:', {
         message: stripeError.message,
         type: stripeError.type,
         code: stripeError.code,
@@ -202,7 +206,7 @@ export default async function handler(req, res) {
       });
 
       return res.status(500).json({
-        error: 'Deposit payment intent creation failed',
+        error: 'Verification payment intent creation failed',
         message: stripeError.message,
         details: {
           type: stripeError.type,
@@ -212,27 +216,29 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('✅ Deposit payment intent created successfully:', {
-      id: paymentIntent.id,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      status: paymentIntent.status,
-      capture_method: paymentIntent.capture_method,
-      client_secret: paymentIntent.client_secret ? 'present' : 'missing'
+    console.log('✅ Verification payment intent created successfully:', {
+      id: verificationIntent.id,
+      amount: verificationIntent.amount,
+      currency: verificationIntent.currency,
+      status: verificationIntent.status,
+      capture_method: verificationIntent.capture_method,
+      client_secret: verificationIntent.client_secret ? 'present' : 'missing'
     });
 
     return res.status(200).json({
       success: true,
       paymentIntent: {
-        id: paymentIntent.id,
-        client_secret: paymentIntent.client_secret,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency,
-        status: paymentIntent.status,
-        capture_method: paymentIntent.capture_method
+        id: verificationIntent.id,
+        client_secret: verificationIntent.client_secret,
+        amount: verificationIntent.amount,
+        currency: verificationIntent.currency,
+        status: verificationIntent.status,
+        capture_method: verificationIntent.capture_method
       },
+      verification: true,
+      main_deposit_amount: amountInCents,
       mode: mode,
-      note: 'Deposit amount will be held (not charged) until captured. This is a manual capture payment intent.'
+      note: 'Step 1: Card verification charge (will be refunded). After successful verification, main deposit will be created.'
     });
 
   } catch (error) {
