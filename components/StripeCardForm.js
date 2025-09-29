@@ -16,6 +16,23 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
   const [authenticationStep, setAuthenticationStep] = useState('');
   const [cardBrand, setCardBrand] = useState('');
 
+  // Function to detect test card patterns
+  const isTestCard = (cardNumber) => {
+    if (!cardNumber) return false;
+    const cleanNumber = cardNumber.replace(/\s/g, '');
+
+    // Common Stripe test card patterns
+    const testCardPatterns = [
+      '4242424242424242', // Visa
+      '4000000000000002', // Visa (declined)
+      '5555555555554444', // Mastercard
+      '378282246310005',  // American Express
+      '6011111111111117', // Discover
+    ];
+
+    return testCardPatterns.some(pattern => cleanNumber.startsWith(pattern.substring(0, 6)));
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Stripe) {
       const stripeInstance = window.Stripe(
@@ -29,7 +46,7 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       setElements(elementsInstance);
 
       const cardElementInstance = elementsInstance.create('card', {
-        hidePostalCode: false, // Always show postal code field
+        hidePostalCode: mode === 'test', // Show postal code in live mode, hide in test mode
         style: {
           base: {
             fontSize: '16px',
@@ -140,20 +157,35 @@ const StripeCardForm = ({ onSubmit, loading, mode }) => {
       return;
     }
 
+    // Check for test cards in live mode before proceeding
+    if (mode === 'live' && isTestCard(realCardNumber)) {
+      setError('❌ Тестовые карты не работают в live режиме. Пожалуйста, используйте реальную карту для live транзакций.');
+      setProcessing(false);
+      setAuthenticationStep('');
+      return;
+    }
+
     try {
       setAuthenticationStep('Creating payment method...');
       console.log('🔄 Creating payment method with mode:', mode);
 
       // Create payment method
-      const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
+      const paymentMethodParams = {
         type: 'card',
         card: cardElement,
-        billing_details: {
+      };
+
+      // Only add default postal code for test mode
+      if (mode === 'test') {
+        paymentMethodParams.billing_details = {
           address: {
-            postal_code: '10110' // Default postal code for THB cards
+            postal_code: '10110' // Default postal code for test mode
           }
-        }
-      });
+        };
+      }
+      // In live mode, let Stripe Elements handle the postal code from user input
+
+      const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod(paymentMethodParams);
 
       if (paymentMethodError) {
         console.error('❌ Payment method creation failed:', paymentMethodError);
